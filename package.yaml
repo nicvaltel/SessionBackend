@@ -1,0 +1,110 @@
+name:                UserSessionBackend
+version:             0.1.0.0
+github:              "githubuser/UserSessionBackend"
+license:             BSD-3-Clause
+author:              "Author name here"
+maintainer:          "example@example.com"
+copyright:           "2025 Author name here"
+
+extra-source-files:
+- README.md
+- CHANGELOG.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/UserSessionBackend#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- text
+- bytestring
+- websockets
+- classy-prelude
+- mtl
+- containers
+- data-has
+- string-random
+- pcre-heavy
+- katip
+- resource-pool
+# - postgresql-simple
+# - postgresql-simple-migration
+- time
+- hedis
+- dotenv
+- either
+- amqp
+- concurrency
+- aeson
+- exceptions
+- safe-exceptions
+- safe
+- mono-traversable
+- scotty
+- http-types
+- cookie
+- wai
+- wai-extra
+- blaze-builder
+# - digestive-functors
+# - digestive-functors-aeson
+# - digestive-functors-blaze
+# - digestive-functors-scotty
+- time-lens
+- blaze-html
+- wai-middleware-static
+- warp
+- template-haskell
+- http-client
+- http-client-tls
+- http-client-conduit
+- req
+- wreq
+
+default-extensions:
+- NoImplicitPrelude
+- OverloadedStrings
+- NamedFieldPuns
+- QuasiQuotes
+- TemplateHaskell
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+
+executables:
+  UserSessionBackend-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - UserSessionBackend
+
+tests:
+  UserSessionBackend-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - UserSessionBackend

@@ -1,0 +1,202 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.35.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           UserSessionBackend
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/UserSessionBackend#readme>
+homepage:       https://github.com/githubuser/UserSessionBackend#readme
+bug-reports:    https://github.com/githubuser/UserSessionBackend/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2025 Author name here
+license:        BSD-3-Clause
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/UserSessionBackend
+
+library
+  exposed-modules:
+      Adapter.InMemory.Auth
+      Domain.Auth
+      Domain.Validation
+      Lib
+  other-modules:
+      Paths_UserSessionBackend
+  autogen-modules:
+      Paths_UserSessionBackend
+  hs-source-dirs:
+      src
+  default-extensions:
+      NoImplicitPrelude
+      OverloadedStrings
+      NamedFieldPuns
+      QuasiQuotes
+      TemplateHaskell
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      aeson
+    , amqp
+    , base >=4.7 && <5
+    , blaze-builder
+    , blaze-html
+    , bytestring
+    , classy-prelude
+    , concurrency
+    , containers
+    , cookie
+    , data-has
+    , dotenv
+    , either
+    , exceptions
+    , hedis
+    , http-client
+    , http-client-conduit
+    , http-client-tls
+    , http-types
+    , katip
+    , mono-traversable
+    , mtl
+    , pcre-heavy
+    , req
+    , resource-pool
+    , safe
+    , safe-exceptions
+    , scotty
+    , string-random
+    , template-haskell
+    , text
+    , time
+    , time-lens
+    , wai
+    , wai-extra
+    , wai-middleware-static
+    , warp
+    , websockets
+    , wreq
+  default-language: Haskell2010
+
+executable UserSessionBackend-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_UserSessionBackend
+  autogen-modules:
+      Paths_UserSessionBackend
+  hs-source-dirs:
+      app
+  default-extensions:
+      NoImplicitPrelude
+      OverloadedStrings
+      NamedFieldPuns
+      QuasiQuotes
+      TemplateHaskell
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      UserSessionBackend
+    , aeson
+    , amqp
+    , base >=4.7 && <5
+    , blaze-builder
+    , blaze-html
+    , bytestring
+    , classy-prelude
+    , concurrency
+    , containers
+    , cookie
+    , data-has
+    , dotenv
+    , either
+    , exceptions
+    , hedis
+    , http-client
+    , http-client-conduit
+    , http-client-tls
+    , http-types
+    , katip
+    , mono-traversable
+    , mtl
+    , pcre-heavy
+    , req
+    , resource-pool
+    , safe
+    , safe-exceptions
+    , scotty
+    , string-random
+    , template-haskell
+    , text
+    , time
+    , time-lens
+    , wai
+    , wai-extra
+    , wai-middleware-static
+    , warp
+    , websockets
+    , wreq
+  default-language: Haskell2010
+
+test-suite UserSessionBackend-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_UserSessionBackend
+  autogen-modules:
+      Paths_UserSessionBackend
+  hs-source-dirs:
+      test
+  default-extensions:
+      NoImplicitPrelude
+      OverloadedStrings
+      NamedFieldPuns
+      QuasiQuotes
+      TemplateHaskell
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      UserSessionBackend
+    , aeson
+    , amqp
+    , base >=4.7 && <5
+    , blaze-builder
+    , blaze-html
+    , bytestring
+    , classy-prelude
+    , concurrency
+    , containers
+    , cookie
+    , data-has
+    , dotenv
+    , either
+    , exceptions
+    , hedis
+    , http-client
+    , http-client-conduit
+    , http-client-tls
+    , http-types
+    , katip
+    , mono-traversable
+    , mtl
+    , pcre-heavy
+    , req
+    , resource-pool
+    , safe
+    , safe-exceptions
+    , scotty
+    , string-random
+    , template-haskell
+    , text
+    , time
+    , time-lens
+    , wai
+    , wai-extra
+    , wai-middleware-static
+    , warp
+    , websockets
+    , wreq
+  default-language: Haskell2010

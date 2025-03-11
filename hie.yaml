@@ -1,0 +1,10 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:UserSessionBackend"
+
+    - path: "app/Main.hs"
+      component: "UserSessionBackend:exe:UserSessionBackend-exe"
+
+    - path: "test"
+      component: "UserSessionBackend:test:UserSessionBackend-test"
