@@ -29,6 +29,7 @@ library
       Domain.Auth
       Domain.Validation
       Lib
+      Logging
   other-modules:
       Paths_UserSessionBackend
   autogen-modules:
