@@ -17,6 +17,7 @@ import qualified Data.ByteString.Char8 as BSC8
 import Control.Monad (MonadFail)
 import Control.Exception.Safe (MonadThrow, MonadCatch)
 import qualified Prelude
+import qualified Adapter.HTTP.Main as HTTP
 
 
 
@@ -49,12 +50,8 @@ runState le state =
   . flip runReaderT state 
   . unApp
   
-runState' :: LogEnv -> b -> ReaderT b (KatipContextT m) a -> m a
-runState' le state =
-  runKatipContextT le () mempty 
-  . flip runReaderT state 
-  
-withState :: (Int -> LogEnv -> AppState -> IO ()) -> IO()
+ 
+withState :: (Int -> LogEnv -> AppState -> IO a) -> IO a
 withState action = do
   let port = 3000
 
@@ -68,11 +65,10 @@ withState action = do
 
 runRoutine :: IO ()
 runRoutine = do
-  withState $ \port le appState@mqState -> do
+  withState $ \port le appState -> do
     let runner = runState le appState
     -- MQAuth.init mqState runner
-    -- HTTP.main port runner
-    pure ()
+    HTTP.main port runner
 
 
 routine :: App ()
@@ -96,3 +92,4 @@ routine = do
       case result of
         Nothing -> pollNotif email
         Just vCode -> return vCode
+        
