@@ -1,10 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module Adapter.HTTP.API.Main where
+module Adapter.HTTP.API.Main (main) where
 
 
 import ClassyPrelude
 import Domain.Auth
-import ClassyPrelude
 import Web.Scotty.Trans
 import Network.HTTP.Types.Status
 import qualified Adapter.HTTP.API.Auth as Auth

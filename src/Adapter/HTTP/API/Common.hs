@@ -6,9 +6,10 @@ import Web.Scotty.Trans
 import Domain.Auth
 -- import qualified Text.Digestive.Form as DF
 -- import qualified Text.Digestive.Aeson as DF
-import Data.Aeson hiding (json)
+import Data.Aeson
 import Network.HTTP.Types.Status
 import Adapter.HTTP.Common
+import Data.Aeson.Key (fromText)
 
 
 -- -- * Forms
@@ -41,3 +42,7 @@ reqCurrentUserId = do
 
 errorResponce :: (ToJSON a) => a -> Value
 errorResponce val = object [ "error" .= val]
+
+
+jsonResponce :: [(Text, Text)] -> Value
+jsonResponce keyValPairs = object [ fromText k .= v | (k, v) <- keyValPairs]

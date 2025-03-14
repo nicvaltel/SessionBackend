@@ -9,4 +9,4 @@ main :: IO ()
 main = do
   -- Adapter.HTTP.Web.Main.main
   -- MemAuth.runTest
-  Lib.runRoutine
+  Lib.runRoutine'

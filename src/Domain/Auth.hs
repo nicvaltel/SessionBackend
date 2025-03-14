@@ -20,6 +20,7 @@ module Domain.Auth
   , register
   , mkEmail
   , mkPassword
+  , findUserByEmailAndPassword
   ) where
 
 import ClassyPrelude
@@ -82,6 +83,8 @@ class Monad m => SessionRepo m where
 class Monad m => EmailVerificationNotif m where
   notifyEmailVerification :: Email -> VerificationCode -> m ()
 
+findUserByEmailAndPassword :: AuthRepo m => Text -> Text -> m (Maybe (UserId, Bool)) -- Bool = email is verified
+findUserByEmailAndPassword authEmail authPassword = findUserByAuth Auth{authEmail = Email authEmail, authPassword = Password authPassword}
 
 
 withUserIdContext :: (KatipContext m) => UserId -> m a -> m a

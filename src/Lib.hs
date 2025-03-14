@@ -3,17 +3,15 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Lib (runRoutine) where
+module Lib (runRoutine, runRoutine') where
 
 import ClassyPrelude
 import Domain.Auth
 import qualified Adapter.InMemory.Auth as Mem
-import qualified Configuration.Dotenv as Dotenv
 import qualified Data.Text as T
 
-import Katip (KatipContextT, LogEnv, KatipContext, Katip, runKatipContextT)
+import Katip (KatipContextT, LogEnv, KatipContext, Katip, runKatipContextT, initLogEnv)
 import Logging (withKatip)
-import qualified Data.ByteString.Char8 as BSC8
 import Control.Monad (MonadFail)
 import Control.Exception.Safe (MonadThrow, MonadCatch)
 import qualified Prelude
@@ -42,8 +40,6 @@ instance SessionRepo App where
   findUserIdBySessionId = Mem.findUserIdBySessionId
 
 
-
-
 runState :: LogEnv -> AppState -> App a -> IO a
 runState le state =
   runKatipContextT le () mempty 
@@ -62,7 +58,6 @@ withState action = do
     action port le appState 
 
 
-
 runRoutine :: IO ()
 runRoutine = do
   withState $ \port le appState -> do
@@ -70,9 +65,32 @@ runRoutine = do
     -- MQAuth.init mqState runner
     HTTP.main port runner
 
+runRoutine' :: IO ()
+runRoutine' = do
+  withStateTest' $ \port le appState -> do
+    let runner = runState le appState
+    -- MQAuth.init mqState runner
+    HTTP.main port runner
 
-routine :: App ()
-routine = do
+
+withStateTest' :: (Int -> LogEnv -> AppState -> IO a) -> IO a
+withStateTest' action = do
+  let port = 3000
+  appState <- getStateFromTestRoutine'
+  withKatip $ \le -> do 
+    action port le appState
+
+
+getStateFromTestRoutine' :: IO AppState
+getStateFromTestRoutine' = do
+  logEnv <- initLogEnv "HAuthTest" "devTest"
+  memState <- newTVarIO Mem.initialState
+  appState :: AppState <- runKatipContextT logEnv () mempty $ runReaderT (unApp testRoutine') memState
+  pure appState
+
+
+testRoutine' :: App AppState
+testRoutine' = do
   emailFileContent <- liftIO $ T.pack <$> Prelude.readFile "test-email.cfg"
   liftIO $ putStrLn emailFileContent
   let email = either undefined id $ mkEmail emailFileContent
@@ -86,6 +104,8 @@ routine = do
   Just uId <- resolveSessionId session
   Just registeredEmail <- getUser uId
   liftIO $ print (session, uId, registeredEmail)
+  ask
+  
   where
     pollNotif email = do
       result <- Mem.getNotificationsForEmail email
