@@ -55,6 +55,17 @@ newSession uId = do
     writeTVar tvar newState
     pure sId
 
+endSession :: InMemory r m => D.SessionId -> m ()
+endSession sId = do
+  tvar <- asks getter 
+  liftIO $ atomically $ do
+    state <- readTVar tvar
+    let sessions = stateSessions state
+        newSessions = Map.delete sId sessions
+        newState = state { stateSessions = newSessions }
+    writeTVar tvar newState
+    pure ()
+
 notifyEmailVerification :: InMemory r m => D.Email -> D.VerificationCode -> m ()
 notifyEmailVerification email vCode = do
   tvar <- asks getter

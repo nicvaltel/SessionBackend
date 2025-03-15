@@ -20,7 +20,8 @@ module Domain.Auth
   , register
   , mkEmail
   , mkPassword
-  , findUserByEmailAndPassword
+  , loginViaEmailAndPassword
+  , logout
   ) where
 
 import ClassyPrelude
@@ -78,13 +79,11 @@ class Monad m => AuthRepo m where
 
 class Monad m => SessionRepo m where
   newSession :: UserId -> m SessionId
+  endSession :: SessionId -> m ()
   findUserIdBySessionId :: SessionId -> m (Maybe UserId)
 
 class Monad m => EmailVerificationNotif m where
   notifyEmailVerification :: Email -> VerificationCode -> m ()
-
-findUserByEmailAndPassword :: AuthRepo m => Text -> Text -> m (Maybe (UserId, Bool)) -- Bool = email is verified
-findUserByEmailAndPassword authEmail authPassword = findUserByAuth Auth{authEmail = Email authEmail, authPassword = Password authPassword}
 
 
 withUserIdContext :: (KatipContext m) => UserId -> m a -> m a
@@ -119,6 +118,14 @@ login auth = runExceptT $ do
         $(logTM) InfoS $ ls (emailRaw $ authEmail auth) <> " logged in successfully"
       pure sId
 
+loginViaEmailAndPassword :: (KatipContext m, AuthRepo m, SessionRepo m) => Text -> Text -> m (Either LoginError SessionId)
+loginViaEmailAndPassword email password = login Auth{authEmail = Email email, authPassword = Password password}
+
+logout :: (KatipContext m, SessionRepo m) => SessionId -> m ()
+logout sessionId = do
+      katipAddContext (sl "sessionId" sessionId) $
+        $(logTM) InfoS "session is logged out"
+      endSession sessionId
 
 getUser :: AuthRepo m => UserId -> m (Maybe Email)
 getUser = findEmailFromUserId

@@ -37,6 +37,7 @@ instance EmailVerificationNotif App where
 
 instance SessionRepo App where
   newSession = Mem.newSession
+  endSession = Mem.endSession
   findUserIdBySessionId = Mem.findUserIdBySessionId
 
 
