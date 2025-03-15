@@ -104,6 +104,11 @@ testRoutine' = do
   Just uId <- resolveSessionId session
   Just registeredEmail <- getUser uId
   liftIO $ print (session, uId, registeredEmail)
+
+  let email2 = either undefined id $ mkEmail "hello2@mail.md"
+  let passw2 = either undefined id $ mkPassword "123456Hello"
+  let auth2 = Auth email2 passw2
+  _ <- register auth2
   ask
   
   where

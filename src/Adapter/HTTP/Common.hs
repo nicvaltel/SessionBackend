@@ -17,12 +17,29 @@ import ClassyPrelude (decodeUtf8, Utf8 (encodeUtf8))
 import Domain.Auth
 import Data.Time.Lens
 
+type CookieName = ByteString
+type CookieValue = ByteString
+type CookieSecure = Bool
+
 
 -- toResult :: Either e a -> DF.Result e a
 -- toResult = either DF.Error DF.Success
 
 setCookie :: MonadIO m => SetCookie -> ActionT m ()
 setCookie = setHeader "Set-Cookie" . decodeUtf8 . toLazyByteString . renderSetCookie
+
+setCookieDefault :: MonadIO m => CookieName -> CookieValue -> CookieSecure -> ActionT m ()
+setCookieDefault cname cval secure = do
+  curTime <- liftIO getCurrentTime
+  setCookie $ def{
+      setCookieName = cname
+    , setCookiePath = Just "/"
+    , setCookieValue = cval
+    , setCookieExpires = Just $ modL month (+ 1) curTime
+    , setCookieHttpOnly = True
+    , setCookieSecure = secure
+    , setCookieSameSite = Just sameSiteLax
+    }
 
 
 getCookie :: Monad m => Text -> ActionT m (Maybe Text)

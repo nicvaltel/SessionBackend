@@ -10,11 +10,9 @@ import Adapter.HTTP.API.Common
 import Katip
 import Data.Aeson -- ( object, KeyValue((.=)), Value (..), Result (..), fromJSON )
 import Data.Aeson.Types (parseMaybe)
-import Web.Cookie (SetCookie(..), def, sameSiteLax)
-import Data.Time.Lens
 
 
-routes :: (MonadUnliftIO m, KatipContext m, AuthRepo m, EmailVerificationNotif m, SessionRepo m) => ScottyT m ()
+routes :: (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m) => ScottyT m ()
 routes = do
   
   -- login 
@@ -22,31 +20,34 @@ routes = do
   post "/api/login" $ do
     inputJson :: Value <- jsonData `catch` (\(_:: SomeException) -> pure Null)
     case inputJson of
-      Null -> pure () -- not a json
+      Null -> do -- not a json
+        lift $ katipAddNamespace "post /api/login" $
+          $(logTM) WarningS "no json provided"
+        json $ jsonResponce [("error" , "no json provided")]
       mayCredentials -> 
         case isValidCredentials mayCredentials of
-          Nothing -> pure () -- json is not an Auth
+          Nothing -> do -- json is not an Auth
+            lift $ katipAddNamespace "post /api/login" $
+              $(logTM) WarningS "json is not an auth"
+            json $ jsonResponce [("error" , "json is not an auth")]
           Just (uname, pass) -> do
-            print "AAAAA!!!!111"
             print (uname, pass)
             authResult <- lift $ findUserByEmailAndPassword uname pass
             case authResult of
-              Nothing -> pure () -- username not found
-              Just (_, False) -> pure () -- email not verified
+              Nothing -> do -- username not found
+                lift $ katipAddNamespace "post /api/login" $
+                  $(logTM) WarningS ("username not found for: " <> ls uname)
+                json $ jsonResponce [("error" , "username not found")]
+              Just (_, False) -> do -- email not verified
+                lift $ katipAddNamespace "post /api/login" $
+                  $(logTM) WarningS ("email not verified: " <> ls uname)
+                json $ jsonResponce [("error" , "email not verified")]
               Just (uId, True) -> do -- Okay
-                curTime <- liftIO getCurrentTime
-                setCookie  def{
-                      setCookieName = "session_token"
-                    , setCookiePath = Just "/"
-                    , setCookieValue = "randomly-generated-session-id"
-                    , setCookieExpires = Just $ modL month (+ 1) curTime
-                    , setCookieHttpOnly = True
-                    , setCookieSecure = True
-                    , setCookieSameSite = Just sameSiteLax
-                    }
-                json $ jsonResponce [ ("message" , "Login successful"), ("session_token", "randomly-generated-session-id")]
-
-    print inputJson
+                lift $ katipAddNamespace "post /api/login" $
+                  $(logTM) InfoS ("login successfully: " <> ls uname)
+                sessionId <- lift $ newSession uId
+                setCookieDefault "session_token" (encodeUtf8 sessionId) True
+                json $ jsonResponce [ ("message" , "Login successful"), ("session_token", sessionId)]
     
 
     -- domainResult <- lift $ login input
@@ -69,8 +70,6 @@ routes = do
 
 
 
-
--- Function to check if a JSON Value matches the expected structure
 isValidCredentials :: Value -> Maybe (Text,Text)
 isValidCredentials value = credentialsParser value >>= Just
   where  
