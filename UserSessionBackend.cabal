@@ -33,6 +33,7 @@ library
       Adapter.HTTP.Web.Main
       Adapter.InMemory.Auth
       Domain.Auth
+      Domain.Room
       Domain.Validation
       Lib
       Logging

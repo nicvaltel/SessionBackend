@@ -16,6 +16,7 @@ import Control.Monad (MonadFail)
 import Control.Exception.Safe (MonadThrow, MonadCatch)
 import qualified Prelude
 import qualified Adapter.HTTP.Main as HTTP
+import Domain.Room (RoomRepo(..))
 
 
 
@@ -40,6 +41,13 @@ instance SessionRepo App where
   endSession = Mem.endSession
   findUserIdBySessionId = Mem.findUserIdBySessionId
 
+instance RoomRepo App where
+  createRoom = Mem.createRoom
+  getOpenRooms = Mem.getOpenRooms
+  joinRoom = Mem.joinRoom
+  closeRoom = Mem.closeRoom
+  
+  
 
 runState :: LogEnv -> AppState -> App a -> IO a
 runState le state =

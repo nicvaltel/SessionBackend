@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 module Adapter.HTTP.API.Auth (routes) where
 
@@ -11,96 +12,29 @@ import Katip
 import Data.Aeson -- ( object, KeyValue((.=)), Value (..), Result (..), fromJSON )
 import Data.Aeson.Types (parseMaybe)
 import Web.Scotty.Cookie (deleteCookie)
+import Domain.Room (RoomRepo(..), UserHost (..), LobbyRoomId (LobbyRoomId))
 
 
-routes :: (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m) => ScottyT m ()
+type EndPointMonad m = (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m, RoomRepo m)
+
+
+routes :: (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m, RoomRepo m) => ScottyT m ()
 routes = do
   
   -- curl -i -d '{"username":"hello@mail.md", "password":"123456Hello"}' -H "Content-Type: application/json" -X POST http://localhost:3000/api/login
-  post "/api/login" $ do
-    let logAction severity message = lift . katipAddNamespace "post /api/login" $ $(logTM) severity message
-    inputJson :: Value <- jsonData `catch` (\(_:: SomeException) -> pure Null)
-    case inputJson of
-      Null -> do -- not a json
-        logAction WarningS "no json provided"
-        json $ jsonResponce [("error" , "no json provided")]
-      mayCredentials -> 
-        case extrectCredentials mayCredentials of
-          Nothing -> do -- json is not an Auth
-            logAction WarningS "json is not an auth"
-            json $ jsonResponce [("error" , "json is not an auth")]
-          Just (uname, pass) -> do
-            loginResult <- lift $ loginViaEmailAndPassword uname pass
-            case loginResult of
-              Left LoginErrorInvalidAuth -> do 
-                logAction WarningS ("Invalid credentials for: " <> ls uname)
-                json $ jsonResponce [("error" , "invalid credentials")]
-              Left LoginErrorEmailNotVerified -> do
-                logAction WarningS ("email not verified: " <> ls uname)
-                json $ jsonResponce [("error" , "email not verified")]
-              Right sessionId -> do
-                -- log InfoS in loginViaEmailAndPassword function
-                setCookieDefault "session_token" (encodeUtf8 sessionId) True
-                json $ jsonResponce [ ("message" , "login successful"), ("session_token", sessionId)]
+  post "/api/login" (postLogin "post /api/login")
 
-
-  post "/api/logout" $ do
-    let logAction severity message = lift . katipAddNamespace "post /api/logout" $ $(logTM) severity message
-    inputJson :: Value <- jsonData `catch` (\(_:: SomeException) -> pure Null)
-    case inputJson of
-      Null -> do -- not a json
-        logAction WarningS "no json provided"
-        json $ jsonResponce [("error" , "no json provided")]
-      maySessionId -> 
-        case extractSessionId maySessionId of
-          Nothing -> do -- json is not a sessionId
-            logAction WarningS "json is not a sessionId"
-            json $ jsonResponce [("error" , "json is not a sessionId")]
-          Just sessionId -> do
-            lift $ logout sessionId
-            -- log InfoS in logout function
-            deleteCookie "session_token"
-            json $ jsonResponce [ ("message" , "logged out successfully")]
-
+  post "/api/logout" (postLogout "post /api/logout" )
 
   -- curl -i -v --cookie "session_token=sId" -X GET http://localhost:3000/api/session
-  get "/api/session" $ do
-    let logAction severity message = lift . katipAddNamespace "get /api/session" $ $(logTM) severity message
-    maySessionId <- getCookie "session_token"
-    case maySessionId of
-      Nothing -> do
-        logAction InfoS "session is not active "
-        json $ jsonResponce [("error", "session expired or invalid")]
-      Just sId -> do
-        mayUserId <- lift $ findUserIdBySessionId sId
-        case mayUserId of
-          Nothing -> do
-            deleteCookie "session_token"
-            logAction InfoS "session is not active "
-            json $ jsonResponce [("error", "session expired or invalid")]
-          Just uId -> do
-            logAction InfoS $ ls $ "session is active " <> sId
-            json $ jsonResponce [("message", "session active"), ("user_id", tshow uId)]
-
+  get "/api/session" (getSession "get /api/session")
 
   -- curl -i -v --cookie "session_token=sId" -X GET http://localhost:3000/api/protected-resource
-  get "/api/protected-resource" $ do
-    let logAction severity message = lift . katipAddNamespace "get /api/protected-resource" $ $(logTM) severity message
-    maySessionId <- getCookie "session_token"
-    case maySessionId of
-      Nothing -> do
-        logAction InfoS "session is not active "
-        json $ jsonResponce [("error", "unauthorized")]
-      Just sId -> do
-        mayUserId <- lift $ findUserIdBySessionId sId
-        case mayUserId of
-          Nothing -> do
-            deleteCookie "session_token"
-            logAction InfoS "session is not active "
-            json $ jsonResponce [("error", "unauthorized")]
-          Just _ -> do
-            logAction InfoS $ ls $ "session is active " <> sId
-            json $ jsonResponce [("data", "Here is your protected data")]
+  get "/api/protected-resource" (getProtectedResource "get /api/protected-resource")
+
+  -- curl -i -v --cookie "session_token=sId" -X POST http://localhost:3000/api/create-room
+  post "/api/create-room" (postCreateRoom "post /api/create-room")
+
 
   -- register
   post "/api/auth/register" $ do
@@ -109,6 +43,117 @@ routes = do
   -- get user
   get "/api/users" $ do
     pure ()
+
+
+logAction' :: (MonadUnliftIO m, KatipContext m) => Namespace -> Severity -> LogStr -> ActionT m ()
+logAction' namespace severity message = lift . katipAddNamespace namespace $ $(logTM) severity message
+
+
+postLogin :: EndPointMonad m => Namespace -> ActionT m ()
+postLogin namespace = do
+  let logAction = logAction' namespace
+  inputJson :: Value <- jsonData `catch` (\(_:: SomeException) -> pure Null)
+  case inputJson of
+    Null -> do -- not a json
+      logAction WarningS "no json provided"
+      json $ jsonResponce [("error" , "no json provided")]
+    mayCredentials -> 
+      case extrectCredentials mayCredentials of
+        Nothing -> do -- json is not an Auth
+          logAction WarningS "json is not an auth"
+          json $ jsonResponce [("error" , "json is not an auth")]
+        Just (uname, pass) -> do
+          loginResult <- lift $ loginViaEmailAndPassword uname pass
+          case loginResult of
+            Left LoginErrorInvalidAuth -> do 
+              logAction WarningS ("Invalid credentials for: " <> ls uname)
+              json $ jsonResponce [("error" , "invalid credentials")]
+            Left LoginErrorEmailNotVerified -> do
+              logAction WarningS ("email not verified: " <> ls uname)
+              json $ jsonResponce [("error" , "email not verified")]
+            Right sessionId -> do
+              -- log InfoS in loginViaEmailAndPassword function
+              setCookieDefault "session_token" (encodeUtf8 sessionId) True
+              json $ jsonResponce [ ("message" , "login successful"), ("session_token", sessionId)]
+
+postLogout :: EndPointMonad m => Namespace -> ActionT m ()
+postLogout namespace = do
+  let logAction = logAction' namespace
+  inputJson :: Value <- jsonData `catch` (\(_:: SomeException) -> pure Null)
+  case inputJson of
+    Null -> do -- not a json
+      logAction WarningS "no json provided"
+      json $ jsonResponce [("error" , "no json provided")]
+    maySessionId -> 
+      case extractSessionId maySessionId of
+        Nothing -> do -- json is not a sessionId
+          logAction WarningS "json is not a sessionId"
+          json $ jsonResponce [("error" , "json is not a sessionId")]
+        Just sessionId -> do
+          lift $ logout sessionId
+          -- log InfoS in logout function
+          deleteCookie "session_token"
+          json $ jsonResponce [ ("message" , "logged out successfully")]
+
+getSession :: EndPointMonad m => Namespace -> ActionT m ()
+getSession namespace = do
+  let logAction = logAction' namespace
+  maySessionId <- getCookie "session_token"
+  case maySessionId of
+    Nothing -> do
+      logAction InfoS "session is not active "
+      json $ jsonResponce [("error", "session expired or invalid")]
+    Just sId -> do
+      mayUserId <- lift $ findUserIdBySessionId sId
+      case mayUserId of
+        Nothing -> do
+          deleteCookie "session_token"
+          logAction InfoS "session is not active "
+          json $ jsonResponce [("error", "session expired or invalid")]
+        Just uId -> do
+          logAction InfoS $ ls $ "session is active " <> sId
+          json $ jsonResponce [("message", "session active"), ("user_id", tshow uId)]
+
+getProtectedResource :: EndPointMonad m => Namespace -> ActionT m ()
+getProtectedResource namespace = do
+  let logAction = logAction' namespace
+  maySessionId <- getCookie "session_token"
+  case maySessionId of
+    Nothing -> do
+      logAction InfoS "session is not active "
+      json $ jsonResponce [("error", "unauthorized")]
+    Just sId -> do
+      mayUserId <- lift $ findUserIdBySessionId sId
+      case mayUserId of
+        Nothing -> do
+          deleteCookie "session_token"
+          logAction InfoS "session is not active "
+          json $ jsonResponce [("error", "unauthorized")]
+        Just _ -> do
+          logAction InfoS $ ls $ "session is active " <> sId
+          json $ jsonResponce [("data", "Here is your protected data")]
+
+postCreateRoom :: EndPointMonad m => Namespace -> ActionT m ()
+postCreateRoom namespace = do
+  let logAction = logAction' namespace
+  maySessionId <- getCookie "session_token"
+  case maySessionId of
+    Nothing -> do
+      logAction InfoS "session is not active "
+      json $ jsonResponce [("error", "unauthorized")]
+    Just sId -> do
+      mayUserId <- lift $ findUserIdBySessionId sId
+      case mayUserId of
+        Nothing -> do
+          deleteCookie "session_token"
+          logAction InfoS "session is not active "
+          json $ jsonResponce [("error", "unauthorized")]
+        Just uId -> do
+          (LobbyRoomId roomId) <- lift $ createRoom (UserHost uId)
+          logAction InfoS $ ls $ "room created by userId=" <> tshow uId <> ", sessionId=" <> sId <> ", lobbyRoomId =" <> roomId
+          json $ jsonResponce [("lobbyRoomId", roomId)]
+
+
 
 
 extrectCredentials :: Value -> Maybe (Text,Text)

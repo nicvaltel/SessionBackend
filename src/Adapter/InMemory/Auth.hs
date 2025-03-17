@@ -5,6 +5,7 @@
 module Adapter.InMemory.Auth where
 
 import ClassyPrelude
+import qualified Prelude
 import qualified Domain.Auth as D
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -12,6 +13,9 @@ import Domain.Auth (Auth(authEmail))
 import Data.Has (Has (..))
 import Control.Monad.Except ( runExceptT, MonadError(throwError) )
 import Text.StringRandom (stringRandomIO)
+import qualified Domain.Room as D
+
+
 
 type InMemory r m = (Has (TVar State) r, MonadReader r m, MonadIO m)
 
@@ -22,6 +26,10 @@ data State = State
   , stateUserIdCounter :: Int
   , stateNotifications :: Map D.Email D.VerificationCode
   , stateSessions :: Map D.SessionId D.UserId
+  , stateLobbyRooms :: [(D.LobbyRoomId, D.UserHost)]
+  , stateRooms :: Map D.RoomId D.RoomData
+  , stateUsersRooms :: Map D.UserId D.RoomId
+  , stateArchiveRooms :: Map D.ArchiveRoomId D.RoomData
   } deriving (Show, Eq)
 
 
@@ -33,6 +41,10 @@ initialState = State
   , stateUserIdCounter = 0
   , stateNotifications = Map.empty
   , stateSessions = Map.empty
+  , stateLobbyRooms = []
+  , stateRooms = Map.empty
+  , stateUsersRooms = Map.empty
+  , stateArchiveRooms = Map.empty
   }
 
 
@@ -141,7 +153,59 @@ addAuth auth = do
     pure (newUserId, vCode)
 
 
+createRoom :: InMemory r m => D.UserHost -> m D.LobbyRoomId
+createRoom hostId = do
+  tvar <- asks getter
+  roomId <- liftIO $ stringRandomIO "[A-Za-z0-9]{32}"
+  let newRoomInList = (D.LobbyRoomId roomId, hostId)
+  liftIO $ atomically $ do
+    state <- readTVar tvar
+    let newLobbyRooms = newRoomInList : stateLobbyRooms state
+    writeTVar tvar $ state {stateLobbyRooms = newLobbyRooms}
+  pure (D.LobbyRoomId roomId)
 
+
+getOpenRooms :: InMemory r m => m [D.LobbyRoomId]
+getOpenRooms = do
+  tvar <- asks getter
+  state <- liftIO $ readTVarIO tvar
+  pure $ map fst $ stateLobbyRooms state
+
+
+joinRoom :: InMemory r m => D.UserGuest -> D.LobbyRoomId -> m (Either D.JoinRoomError D.RoomId)
+joinRoom guestId lobbyRoomId = do
+  tvar <- asks getter
+  let roomId = D.lobbyRoomIdToRoomId lobbyRoomId
+  liftIO $ atomically $ runExceptT $ do
+    state <- lift $ readTVar tvar
+    case Prelude.lookup lobbyRoomId (stateLobbyRooms state) of
+      Nothing -> throwError D.JoinRoomErrorRoomDoesntExist
+      Just hostId -> do
+        let roomData = D.newRoomData hostId guestId
+        let newLobbyRooms = filter (\(lrId,_) -> lobbyRoomId /= lrId) (stateLobbyRooms state)
+        let newRooms = Map.insert roomId roomData(stateRooms state)
+        let newUsersRooms = 
+              Map.insert (D.unUserHost hostId) roomId $ 
+              Map.insert (D.unUserGuest guestId) roomId $
+              stateUsersRooms state
+        lift $ writeTVar tvar state{stateLobbyRooms = newLobbyRooms, stateRooms = newRooms, stateUsersRooms = newUsersRooms}
+        pure roomId 
+
+
+closeRoom :: InMemory r m => D.RoomId -> m (Either D.CloseRoomError D.ArchiveRoomId)
+closeRoom roomId = do
+  tvar <- asks getter
+  let acrhiveRoomId = D.roomIdToAcrhiveRoomId roomId
+  liftIO $ atomically $ runExceptT $ do
+    state <- lift $ readTVar tvar
+    case Map.lookup roomId (stateRooms state) of
+      Nothing -> throwError D.CloseRoomErrorRoomDoesntExist
+      Just roomData -> do
+        let newRooms = Map.delete roomId (stateRooms state)
+        let newArchiveRooms = 
+              Map.insert acrhiveRoomId roomData $ stateArchiveRooms state
+        lift $ writeTVar tvar state{stateRooms = newRooms, stateArchiveRooms = newArchiveRooms}
+        pure acrhiveRoomId 
 
 runTest :: IO ()
 runTest = do
