@@ -78,6 +78,7 @@ postLogin namespace = do
               setCookieDefault "session_token" (encodeUtf8 sessionId) True
               json $ jsonResponce [ ("message" , "login successful"), ("session_token", sessionId)]
 
+
 postLogout :: EndPointMonad m => Namespace -> ActionT m ()
 postLogout namespace = do
   let logAction = logAction' namespace
@@ -97,75 +98,67 @@ postLogout namespace = do
           deleteCookie "session_token"
           json $ jsonResponce [ ("message" , "logged out successfully")]
 
+
 getSession :: EndPointMonad m => Namespace -> ActionT m ()
 getSession namespace = do
   let logAction = logAction' namespace
-  maySessionId <- getCookie "session_token"
-  case maySessionId of
-    Nothing -> do
-      logAction InfoS "session is not active "
-      json $ jsonResponce [("error", "session expired or invalid")]
-    Just sId -> do
-      mayUserId <- lift $ findUserIdBySessionId sId
-      case mayUserId of
-        Nothing -> do
-          deleteCookie "session_token"
-          logAction InfoS "session is not active "
-          json $ jsonResponce [("error", "session expired or invalid")]
-        Just uId -> do
-          logAction InfoS $ ls $ "session is active " <> sId
-          json $ jsonResponce [("message", "session active"), ("user_id", tshow uId)]
+  maySession <- checkSessionActionT logAction
+  case maySession of
+    Nothing -> pure ()
+    Just (uId, sId) -> do
+      logAction InfoS $ ls $ "session is active " <> sId
+      json $ jsonResponce [("message", "session active"), ("user_id", tshow uId)]
 
 
 postCreateRoom :: EndPointMonad m => Namespace -> ActionT m ()
 postCreateRoom namespace = do
   let logAction = logAction' namespace
-  maySessionId <- getCookie "session_token"
-  case maySessionId of
-    Nothing -> do
-      logAction InfoS "session is not active "
-      json $ jsonResponce [("error", "unauthorized")]
-    Just sId -> do
-      mayUserId <- lift $ findUserIdBySessionId sId
-      case mayUserId of
-        Nothing -> do
-          deleteCookie "session_token"
-          logAction InfoS "session is not active "
-          json $ jsonResponce [("error", "unauthorized")]
-        Just uId -> do
-          (LobbyRoomId roomId) <- lift $ createRoom (UserHost uId)
-          logAction InfoS $ ls $ "room created by userId=" <> tshow uId <> ", sessionId=" <> sId <> ", lobbyRoomId =" <> roomId
-          json $ jsonResponce [("lobby_room_id", roomId)]
+  maySession <- checkSessionActionT logAction
+  case maySession of
+    Nothing -> pure ()
+    Just (uId, sId) -> do
+      (LobbyRoomId roomId) <- lift $ createRoom (UserHost uId)
+      logAction InfoS $ ls $ "room created by userId=" <> tshow uId <> ", sessionId=" <> sId <> ", lobbyRoomId =" <> roomId
+      json $ jsonResponce [("lobby_room_id", roomId)]
+
 
 getLobby :: EndPointMonad m => Namespace -> ActionT m ()
 getLobby namespace = do
   let logAction = logAction' namespace
-  maySessionId <- getCookie "session_token"
-  case maySessionId of
-    Nothing -> do
-      logAction InfoS "session is not active "
-      json $ jsonResponce [("error", "unauthorized")]
-    Just sId -> do
-      mayUserId <- lift $ findUserIdBySessionId sId
-      case mayUserId of
-        Nothing -> do
-          deleteCookie "session_token"
-          logAction InfoS "session is not active "
-          json $ jsonResponce [("error", "unauthorized")]
-        Just _ -> do
-          lobby <- lift getOpenRooms
-          json $ object ["lobby_rooms_id" .= map unLobbyRoomId lobby]
+  maySession <- checkSessionActionT logAction
+  case maySession of
+    Nothing -> pure ()
+    Just _ -> do
+      lobby <- lift getOpenRooms
+      json $ object ["lobby_rooms_id" .= map unLobbyRoomId lobby]
 
 
 getJoinRoom :: EndPointMonad m => Text -> ActionT m ()
 getJoinRoom namespace = do
   roomId :: Text <- pathParam "room_id"
   let logAction = logAction' (Namespace [namespace <> roomId])
+  maySession <- checkSessionActionT logAction
+  case maySession of
+    Nothing -> pure ()
+    Just (uId, _) -> do
+      eitherRoomId <- lift $ joinRoom (UserGuest uId) (LobbyRoomId roomId)
+      case eitherRoomId of
+        Left JoinRoomErrorRoomDoesntExist -> do
+          logAction InfoS "room is not active"
+          json $ jsonResponce [("error", "room is not active")]
+        Right (RoomId rId) -> do
+          logAction InfoS ("room started, roomId=" <> ls rId)
+          json $ object ["room_id" .= rId]
+
+
+checkSessionActionT :: EndPointMonad m => (Severity -> LogStr -> ActionT m ()) -> ActionT m (Maybe (UserId, SessionId))
+checkSessionActionT logAction = do
   maySessionId <- getCookie "session_token"
   case maySessionId of
     Nothing -> do
       logAction InfoS "session is not active "
       json $ jsonResponce [("error", "unauthorized")]
+      pure Nothing
     Just sId -> do
       mayUserId <- lift $ findUserIdBySessionId sId
       case mayUserId of
@@ -173,16 +166,9 @@ getJoinRoom namespace = do
           deleteCookie "session_token"
           logAction InfoS "session is not active "
           json $ jsonResponce [("error", "unauthorized")]
-        Just uId -> do
-          eitherRoomId <- lift $ joinRoom (UserGuest uId) (LobbyRoomId roomId)
-          case eitherRoomId of
-            Left JoinRoomErrorRoomDoesntExist -> do
-              logAction InfoS "room is not active"
-              json $ jsonResponce [("error", "room is not active")]
-            Right (RoomId rId) -> do
-              logAction InfoS ("room started, roomId=" <> ls rId)
-              json $ object ["room_id" .= rId]
-
+          pure Nothing
+        Just uId -> pure (Just (uId, sId))
+        
 extrectCredentials :: Value -> Maybe (Text,Text)
 extrectCredentials value = credentialsParser value >>= Just
   where  
