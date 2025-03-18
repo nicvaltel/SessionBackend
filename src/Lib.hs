@@ -115,9 +115,16 @@ testRoutine' = do
   liftIO $ print (session, uId, registeredEmail)
 
   let email2 = either undefined id $ mkEmail "hello2@mail.md"
-  let passw2 = either undefined id $ mkPassword "123456Hello"
+  let passw2 = either undefined id $ mkPassword "123456Hello2"
   let auth2 = Auth email2 passw2
   _ <- register auth2
+  vCode2 <- App $ pollNotif email2
+  _ <- verifyEmail vCode2
+  Right session2 <- login auth2
+  Just uId2 <- resolveSessionId session2
+  Just registeredEmail2 <- getUser uId2
+  liftIO $ print (session2, uId2, registeredEmail2)
+
   ask
   
   where

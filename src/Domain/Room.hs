@@ -21,7 +21,7 @@ import Domain.Auth (UserId)
 newtype RoomId = RoomId Text
   deriving (Show, Eq, Ord)
 
-newtype LobbyRoomId = LobbyRoomId Text
+newtype LobbyRoomId = LobbyRoomId {unLobbyRoomId :: Text}
   deriving (Show, Eq, Ord)
 
 newtype ArchiveRoomId = ArchiveRoomId Text
