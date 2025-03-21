@@ -16,12 +16,12 @@ import Domain.Room (RoomRepo)
 
 
 main :: 
-  (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m, RoomRepo m) =>
+  (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m, RoomRepo m, EmailVerificationNotif m) =>
   (m Response -> IO Response) -> IO Application
 main runner = scottyAppT defaultOptions runner routes
 
 routes :: 
-  ( MonadUnliftIO m, KatipContext m, AuthRepo m , SessionRepo m, RoomRepo m) =>
+  ( MonadUnliftIO m, KatipContext m, AuthRepo m , SessionRepo m, RoomRepo m, EmailVerificationNotif m) =>
   ScottyT m ()
 routes = do
   middleware $ gzip $ def {gzipFiles = GzipCompress}

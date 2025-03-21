@@ -16,6 +16,7 @@ import Web.Cookie
 import ClassyPrelude (decodeUtf8, Utf8 (encodeUtf8))
 import Domain.Auth
 import Data.Time.Lens
+import Katip (KatipContext, katipAddNamespace, Namespace (Namespace))
 
 type CookieName = ByteString
 type CookieValue = ByteString
@@ -24,6 +25,9 @@ type CookieSecure = Bool
 
 -- toResult :: Either e a -> DF.Result e a
 -- toResult = either DF.Error DF.Success
+
+liftKatipContext :: (KatipContext m) => m a -> ActionT m a
+liftKatipContext = lift . katipAddNamespace (Namespace mempty)
 
 setCookie :: MonadIO m => SetCookie -> ActionT m ()
 setCookie = setHeader "Set-Cookie" . decodeUtf8 . toLazyByteString . renderSetCookie

@@ -3,5 +3,6 @@ dist-newstyle/
 db/postgres
 depends/
 depends_back/
+email/
 **/*.env
 *~

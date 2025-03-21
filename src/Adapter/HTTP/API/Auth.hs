@@ -18,7 +18,7 @@ import Domain.Room (RoomRepo(..), UserHost (..), LobbyRoomId (..), UserGuest (Us
 type EndPointMonad m = (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m, RoomRepo m)
 
 
-routes :: (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m, RoomRepo m) => ScottyT m ()
+routes :: (EndPointMonad m, EmailVerificationNotif m) => ScottyT m ()
 routes = do
   
   -- curl -i -d '{"username":"hello@mail.md", "password":"123456Hello"}' -H "Content-Type: application/json" -X POST http://localhost:3000/api/login
@@ -39,8 +39,9 @@ routes = do
   get "/api/join-room/:room_id" (getJoinRoom "/api/join-room/")
 
   -- register
-  post "/api/auth/register" $ do
-    pure ()
+  post "/api/auth/register" (postRegister "post /api/register")
+
+  get "/api/verify/:v_code" (getVerify "get /api/verify")
 
   -- get user
   get "/api/users" $ do
@@ -59,8 +60,8 @@ postLogin namespace = do
     Null -> do -- not a json
       logAction WarningS "no json provided"
       json $ jsonResponce [("error" , "no json provided")]
-    mayCredentials -> 
-      case extrectCredentials mayCredentials of
+    credentials -> 
+      case extractCredentials credentials of
         Nothing -> do -- json is not an Auth
           logAction WarningS "json is not an auth"
           json $ jsonResponce [("error" , "json is not an auth")]
@@ -76,7 +77,7 @@ postLogin namespace = do
             Right sessionId -> do
               -- log InfoS in loginViaEmailAndPassword function
               setCookieDefault "session_token" (encodeUtf8 sessionId) True
-              json $ jsonResponce [ ("message" , "login successful"), ("session_token", sessionId)]
+              json $ jsonResponce [("message" , "login successful"), ("session_token", sessionId)]
 
 
 postLogout :: EndPointMonad m => Namespace -> ActionT m ()
@@ -87,13 +88,13 @@ postLogout namespace = do
     Null -> do -- not a json
       logAction WarningS "no json provided"
       json $ jsonResponce [("error" , "no json provided")]
-    maySessionId -> 
-      case extractSessionId maySessionId of
+    sessionData -> 
+      case extractSessionId sessionData of
         Nothing -> do -- json is not a sessionId
           logAction WarningS "json is not a sessionId"
           json $ jsonResponce [("error" , "json is not a sessionId")]
-        Just sessionId -> do
-          lift $ logout sessionId
+        Just sId -> do
+          lift $ logout sId
           -- log InfoS in logout function
           deleteCookie "session_token"
           json $ jsonResponce [ ("message" , "logged out successfully")]
@@ -145,13 +146,53 @@ getJoinRoom namespace = do
       case eitherRoomId of
         Left JoinRoomErrorRoomDoesntExist -> do
           logAction InfoS "room is not active"
-          json $ jsonResponce [("error", "room is not active")]
+          json $ object ["error" .= ("room is not active" :: Text)]
         Right (RoomId rId) -> do
           logAction InfoS ("room started, roomId=" <> ls rId)
           json $ object ["room_id" .= rId]
 
 
-checkSessionActionT :: EndPointMonad m => (Severity -> LogStr -> ActionT m ()) -> ActionT m (Maybe (UserId, SessionId))
+postRegister :: (EndPointMonad m, EmailVerificationNotif m) => Namespace -> ActionT m ()
+postRegister namespace = do
+  let logAction = logAction' namespace
+  inputJson :: Value <- jsonData `catch` (\(_:: SomeException) -> pure Null)
+  case inputJson of
+    Null -> do -- not a json
+      logAction WarningS "no json provided"
+      json $ jsonResponce [("error" , "no json provided")]
+    registerData -> 
+      case extractRegisterData registerData of
+        Nothing -> do -- json is not an Auth
+          logAction WarningS "json is not a register data"
+          json $ jsonResponce [("error" , "json is not a register data")]
+        Just (email, pass) -> do
+          eitherRegError <- liftKatipContext $ registerViaEmailPassword email pass
+          case eitherRegError of
+            Left RegistrationErrorEmailTaken -> do
+              logAction InfoS ("registration error email taken, email=" <> ls email)
+              json $ object ["error" .= ("registration error email taken" :: Text)]
+            Left (RegistrationErrorIncorrectEmailOrPassword errs) -> do
+              logAction InfoS ("incorrect email or password, email=" <> ls email)
+              json $ object ["error" .= ("incorrect email or password" :: Text), "error_messages" .= errs]
+            Right () -> do
+              logAction InfoS ("user registered, email=" <> ls email)
+              json $ object ["message" .= ("verification code sended" :: Text)]
+
+getVerify :: EndPointMonad m => Text -> ActionT m ()
+getVerify namespace = do
+  vCode :: Text <- pathParam "v_code"
+  let logAction = logAction' (Namespace [namespace <> vCode])
+  eitherVerifError <- liftKatipContext $ verifyEmail vCode
+  case eitherVerifError of
+    Left EmailVerificationErrorInvalidCode -> do
+      logAction InfoS "email verification error invalid code"
+      json $ object ["error" .= ("email verification error invalid code" :: Text)]
+    Right () -> do
+      logAction InfoS $ "email verification successful, vcode =" <> ls vCode
+      json $ object ["message" .= ("email verification successful" :: Text)]
+      
+
+checkSessionActionT :: (MonadIO m, SessionRepo m) => (Severity -> LogStr -> ActionT m ()) -> ActionT m (Maybe (UserId, SessionId))
 checkSessionActionT logAction = do
   maySessionId <- getCookie "session_token"
   case maySessionId of
@@ -168,9 +209,10 @@ checkSessionActionT logAction = do
           json $ jsonResponce [("error", "unauthorized")]
           pure Nothing
         Just uId -> pure (Just (uId, sId))
+
         
-extrectCredentials :: Value -> Maybe (Text,Text)
-extrectCredentials value = credentialsParser value >>= Just
+extractCredentials :: Value -> Maybe (Text,Text)
+extractCredentials value = credentialsParser value >>= Just
   where  
       credentialsParser = 
         parseMaybe (withObject "Credentials" $ \obj -> do
@@ -178,6 +220,15 @@ extrectCredentials value = credentialsParser value >>= Just
           pass :: Text <- obj .: "password"
           pure (uname, pass))
 
+
+extractRegisterData :: Value -> Maybe (Text, Text)
+extractRegisterData value = credentialsParser value >>= Just
+  where  
+      credentialsParser = 
+        parseMaybe (withObject "Credentials" $ \obj -> do
+          email :: Text <- obj .: "email"
+          pass :: Text <- obj .: "password"
+          pure (email, pass))
 
 -- Function to extract sessionId from a JSON Value
 extractSessionId :: Value -> Maybe SessionId

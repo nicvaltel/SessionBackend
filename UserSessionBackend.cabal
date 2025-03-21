@@ -25,6 +25,7 @@ source-repository head
 
 library
   exposed-modules:
+      Adapter.Email.SendMail
       Adapter.HTTP.API.Auth
       Adapter.HTTP.API.Common
       Adapter.HTTP.API.Main
@@ -74,11 +75,13 @@ library
     , mono-traversable
     , mtl
     , pcre-heavy
+    , process
     , req
     , resource-pool
     , safe
     , safe-exceptions
     , scotty
+    , smtp-mail
     , string-random
     , template-haskell
     , text
@@ -132,11 +135,13 @@ executable UserSessionBackend-exe
     , mono-traversable
     , mtl
     , pcre-heavy
+    , process
     , req
     , resource-pool
     , safe
     , safe-exceptions
     , scotty
+    , smtp-mail
     , string-random
     , template-haskell
     , text
@@ -191,11 +196,13 @@ test-suite UserSessionBackend-test
     , mono-traversable
     , mtl
     , pcre-heavy
+    , process
     , req
     , resource-pool
     , safe
     , safe-exceptions
     , scotty
+    , smtp-mail
     , string-random
     , template-haskell
     , text

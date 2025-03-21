@@ -12,7 +12,7 @@ import Network.HTTP.Types.Status
 
 import Network.Wai
 import Network.Wai.Middleware.Gzip
-import Network.Wai.Middleware.Static (staticPolicy', CacheContainer, addBase, initCaching, CachingStrategy (..))
+import Network.Wai.Middleware.Static (staticPolicy', CacheContainer, addBase, initCaching, CachingStrategy (..), staticPolicy)
 import Katip (KatipContext, logTM, Severity (..), ls)
 -- import qualified Adapter.HTTP.Web.Auth as WebAuth
 
@@ -31,9 +31,15 @@ routes ::
 routes cachingStrategy= do
 
   middleware $ gzip $ def {gzipFiles = GzipCompress}
-  middleware $ staticPolicy' cachingStrategy (addBase "src/Adapter/HTTP/Web")
+  -- middleware $ staticPolicy' cachingStrategy (addBase "src/Adapter/HTTP/Web")
+  middleware $ staticPolicy' cachingStrategy (addBase "static") 
 
   -- WebAuth.routes
+  get "/" $ file "static/html/index.html"  -- Serve the main page
+
+  get "/register" $ file "static/html/register.html"  
+
+  get "/verify" $ file "static/html/verify.html"  
 
   notFound $ do
     status status404

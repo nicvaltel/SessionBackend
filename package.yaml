@@ -65,6 +65,8 @@ dependencies:
 - http-client-conduit
 - req
 - wreq
+- smtp-mail
+- process
 
 default-extensions:
 - NoImplicitPrelude

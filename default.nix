@@ -29,6 +29,8 @@ in
       pkgs.postgresql
       pkgs.libpqxx
       pkgs.haskellPackages.postgresql-libpq
+
+      pkgs.nodePackages.live-server
     ];
 }
 

@@ -3,6 +3,7 @@
 module Domain.Auth
   ( Auth(..)
   , Email
+  , emailRaw
   , Password
   , RegistrationError(..)
   , AuthRepo(..)
@@ -22,6 +23,7 @@ module Domain.Auth
   , mkPassword
   , loginViaEmailAndPassword
   , logout
+  , registerViaEmailPassword
   ) where
 
 import ClassyPrelude
@@ -44,7 +46,7 @@ data Auth = Auth
 newtype Password = Password { passwordRaw :: Text} 
   deriving (Show, Eq)
 
-data RegistrationError = RegistrationErrorEmailTaken
+data RegistrationError = RegistrationErrorEmailTaken | RegistrationErrorIncorrectEmailOrPassword [Text]
   deriving (Show, Eq)
 
 data EmailVerificationError = EmailVerificationErrorInvalidCode
@@ -97,7 +99,15 @@ register auth = runExceptT $ do
   withUserIdContext uId $
     $(logTM) InfoS $ ls (emailRaw email) <> " is registered successfully"
   
-  
+registerViaEmailPassword :: (KatipContext m, AuthRepo m, EmailVerificationNotif m) => Text -> Text -> m (Either RegistrationError ())
+registerViaEmailPassword emailText passText = do
+  let eitherAuth = do
+        authEmail <- mkEmail emailText
+        authPassword <- mkPassword passText
+        pure Auth{authEmail, authPassword}
+  case eitherAuth of
+    Left errors -> pure $ Left (RegistrationErrorIncorrectEmailOrPassword errors)
+    Right auth -> register auth
  
 verifyEmail :: (KatipContext m, AuthRepo m) => VerificationCode -> m (Either EmailVerificationError ())
 verifyEmail vCode = runExceptT $ do

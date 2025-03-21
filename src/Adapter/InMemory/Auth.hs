@@ -14,6 +14,7 @@ import Data.Has (Has (..))
 import Control.Monad.Except ( runExceptT, MonadError(throwError) )
 import Text.StringRandom (stringRandomIO)
 import qualified Domain.Room as D
+import Adapter.Email.SendMail (sendMail)
 
 
 
@@ -87,6 +88,7 @@ notifyEmailVerification email vCode = do
         newNotifications = Map.insert email vCode notifications
         newState = state {stateNotifications = newNotifications}
     writeTVar tvar newState
+  sendMail email "Email Verification Code" ("Email Verification Code=" <> vCode)
 
 getNotificationsForEmail ::  InMemory r m => D.Email -> m (Maybe D.VerificationCode)
 getNotificationsForEmail email = do

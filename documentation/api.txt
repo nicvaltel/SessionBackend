@@ -1,0 +1,29 @@
+post "/api/login"
+fail: 
+  [("error" , "no json provided")],
+  [("error" , "json is not an auth")],
+  [("error" , "invalid credentials")],
+  [("error" , "email not verified")]
+success: [("message" , "login successful"), ("session_token", sessionId)]
+
+post "/api/logout"
+
+
+get "/api/session"
+post "/api/create-room"
+get "/api/lobby"
+get "/api/join-room/:room_id"
+
+
+post "/api/auth/register"
+fail: 
+  [("error" , "no json provided")],
+  [("error" , "json is not a register data")],
+  [("error" , "registration error email taken")],
+  [("error" ,"incorrect email or password"), ("error_messages" , error_messages)]
+success: [("message" , "verification code sended")]
+
+get "/api/verify/:v_code"
+fail: 
+  [("error" , "email verification error invalid code")],
+success: [("message" , "email verification successful")]
