@@ -39,7 +39,7 @@ routes = do
   get "/api/join-room/:room_id" (getJoinRoom "/api/join-room/")
 
   -- register
-  post "/api/auth/register" (postRegister "post /api/register")
+  post "/api/register" (postRegister "post /api/register")
 
   get "/api/verify/:v_code" (getVerify "get /api/verify")
 

@@ -32,14 +32,19 @@ routes cachingStrategy= do
 
   middleware $ gzip $ def {gzipFiles = GzipCompress}
   -- middleware $ staticPolicy' cachingStrategy (addBase "src/Adapter/HTTP/Web")
-  middleware $ staticPolicy' cachingStrategy (addBase "static") 
+  -- middleware $ staticPolicy' cachingStrategy (addBase "static") 
+  middleware $ staticPolicy  (addBase "static") 
 
   -- WebAuth.routes
-  get "/" $ file "static/html/index.html"  -- Serve the main page
+  get "/" $ file "static/html/index.html" -- Serve the main page
+  get "/index" $ file "static/html/index.html"  
+  get "/index.html" $ file "static/html/index.html"
 
   get "/register" $ file "static/html/register.html"  
 
-  get "/verify" $ file "static/html/verify.html"  
+  get "/verify" $ file "static/html/verify.html"
+
+  get "/login" $ file "static/html/login.html"
 
   notFound $ do
     status status404

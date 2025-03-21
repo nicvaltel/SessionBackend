@@ -15,7 +15,7 @@ get "/api/lobby"
 get "/api/join-room/:room_id"
 
 
-post "/api/auth/register"
+post "/api/register"
 fail: 
   [("error" , "no json provided")],
   [("error" , "json is not a register data")],
