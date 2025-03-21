@@ -12,16 +12,6 @@
     <button onclick="verify()">Verify</button>
     <p id="verifyMessage"></p>
 
-    <script>
-        function verify() {
-            const v_code = document.getElementById("v_code").value;
-            fetch(`http://localhost:3000/api/verify/${v_code}`)
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById("verifyMessage").textContent = data.message || data.error;
-            })
-            .catch(error => console.error("Error:", error));
-        }
-    </script>
+    <script src="auth.js" defer></script>
 </body>
 </html>
