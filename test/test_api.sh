@@ -1,10 +1,9 @@
 #!/bin/bash
 
-URL="http://localhost:3000/api/login"
-
 # Execute curl request and store the response
-RESPONSE1=$(curl -s -X POST "$URL" -H "Content-Type: application/json" -d '{"username":"hello@mail.md", "password":"123456Hello"}')
-RESPONSE2=$(curl -s -X POST "$URL" -H "Content-Type: application/json" -d '{"username":"hello2@mail.md", "password":"123456Hello2"}')
+URL_LOGIN="http://localhost:3000/api/login"
+RESPONSE1=$(curl -s -X POST "$URL_LOGIN" -H "Content-Type: application/json" -d '{"username":"hello@mail.md", "password":"123456Hello"}')
+RESPONSE2=$(curl -s -X POST "$URL_LOGIN" -H "Content-Type: application/json" -d '{"username":"hello2@mail.md", "password":"123456Hello2"}')
 
 # Extract the session_token field from the JSON response
 SESSION_TOKEN1=$(echo "$RESPONSE1" | jq -r '.session_token')
