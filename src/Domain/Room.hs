@@ -8,6 +8,7 @@ module Domain.Room
   , RoomRepo(..)
   , JoinRoomError(..)
   , CloseRoomError(..)
+  , GameParams(..)
   , lobbyRoomIdToRoomId
   , newRoomData
   , roomIdToAcrhiveRoomId
@@ -56,3 +57,7 @@ class Monad m => RoomRepo m where
   getOpenRooms :: m [LobbyRoomId]
   joinRoom :: UserGuest  -> LobbyRoomId -> m (Either JoinRoomError RoomId)
   closeRoom :: RoomId -> m (Either CloseRoomError ArchiveRoomId)
+
+
+data GameParams = GameParamsCasual | GameParamsRated
+  deriving (Show, Eq, Ord)

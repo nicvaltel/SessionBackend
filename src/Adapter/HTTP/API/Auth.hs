@@ -12,7 +12,7 @@ import Katip
 import Data.Aeson -- ( object, KeyValue((.=)), Value (..), Result (..), fromJSON )
 import Data.Aeson.Types (parseMaybe)
 import Web.Scotty.Cookie (deleteCookie)
-import Domain.Room (RoomRepo(..), UserHost (..), LobbyRoomId (..), UserGuest (UserGuest), JoinRoomError (..), RoomId (..))
+import Domain.Room (RoomRepo(..), UserHost (..), LobbyRoomId (..), UserGuest (UserGuest), JoinRoomError (..), RoomId (..), GameParams(..))
 
 
 type EndPointMonad m = (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m, RoomRepo m)
@@ -114,13 +114,24 @@ getSession namespace = do
 postCreateRoom :: EndPointMonad m => Namespace -> ActionT m ()
 postCreateRoom namespace = do
   let logAction = logAction' namespace
-  maySession <- checkSessionActionT logAction
-  case maySession of
-    Nothing -> pure ()
-    Just (uId, sId) -> do
-      (LobbyRoomId roomId) <- lift $ createRoom (UserHost uId)
-      logAction InfoS $ ls $ "room created by userId=" <> tshow uId <> ", sessionId=" <> sId <> ", lobbyRoomId =" <> roomId
-      json $ jsonResponce [("lobby_room_id", roomId)]
+  inputJson :: Value <- jsonData `catch` (\(_:: SomeException) -> pure Null)
+  case inputJson of
+    Null -> do -- not a json
+      logAction WarningS "no json provided"
+      json $ jsonResponce [("error" , "no json provided")]
+    gameParamsValue -> 
+      case extractGameParams gameParamsValue of
+        Nothing -> do
+          logAction WarningS "json is not a game data"
+          json $ jsonResponce [("error" , "json is not a game data")]
+        Just gameParams -> do
+          maySession <- checkSessionActionT logAction
+          case maySession of
+            Nothing -> pure ()
+            Just (uId, sId) -> do
+              (LobbyRoomId roomId) <- lift $ createRoom (UserHost uId)
+              logAction InfoS $ ls $ "room created by userId=" <> tshow uId <> ", sessionId=" <> sId <> ", lobbyRoomId =" <> roomId
+              json $ jsonResponce [("lobby_room_id", roomId)]
 
 
 getLobby :: EndPointMonad m => Namespace -> ActionT m ()
@@ -229,6 +240,19 @@ extractRegisterData value = credentialsParser value >>= Just
           email :: Text <- obj .: "email"
           pass :: Text <- obj .: "password"
           pure (email, pass))
+
+extractGameParams :: Value -> Maybe GameParams
+extractGameParams value = parser value >>= getGameParams
+  where  
+      parser = 
+        parseMaybe (withObject "Credentials" $ \obj -> do
+          gameType :: Text <- obj .: "game_type"
+          pure gameType)
+
+      getGameParams :: Text -> Maybe GameParams
+      getGameParams "rated" = Just GameParamsRated
+      getGameParams "casual" = Just GameParamsCasual
+      getGameParams _ = Nothing
 
 -- Function to extract sessionId from a JSON Value
 extractSessionId :: Value -> Maybe SessionId

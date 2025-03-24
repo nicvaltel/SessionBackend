@@ -46,6 +46,8 @@ routes cachingStrategy= do
 
   get "/login" $ file "static/html/login.html"
 
+  get "/create-room" $ file "static/html/create-room.html"
+
   notFound $ do
     status status404
     text "Not found"

@@ -10,7 +10,17 @@ post "/api/logout"
 
 
 get "/api/session"
+
+
 post "/api/create-room"
+send json: [("game_params", param)], where param = "casual" or "rated"
+fail: 
+  [("error" , "no json provided")],
+  [("error" , "json is not a game data")]
+success: 
+[("lobby_room_id", roomId)]
+
+
 get "/api/lobby"
 get "/api/join-room/:room_id"
 
