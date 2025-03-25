@@ -13,7 +13,8 @@ SESSION_TOKEN2=$(echo "$RESPONSE2" | jq -r '.session_token')
 echo "Session Token1: $SESSION_TOKEN1"
 echo "Session Token2: $SESSION_TOKEN2"
 
-RESPONSE_CREATE_ROOM=$(curl -s -X POST http://localhost:3000/api/create-room --cookie "session_token=$SESSION_TOKEN1")
+URL_CREATE_ROOM="http://localhost:3000/api/create-room"
+RESPONSE_CREATE_ROOM=$(curl -s -X POST "$URL_CREATE_ROOM" -H "Content-Type: application/json" -d '{"game_type":"casual"}' --cookie "session_token=$SESSION_TOKEN1")
 LOBBY_ROOM_ID=$(echo "$RESPONSE_CREATE_ROOM" | jq -r '.lobby_room_id')
 echo "lobbyRoomId: $LOBBY_ROOM_ID"
 
@@ -24,7 +25,7 @@ echo "all lobby rooms: $LOBBY_ALL_ROOMS"
 echo "lobby first room: $LOBBY_ALL_ROOMS_1"
 
 
-RESPONSE_JOIN_ROOM=$(curl -s -X GET http://localhost:3000/api/join-room/$LOBBY_ALL_ROOMS_1 --cookie "session_token=$SESSION_TOKEN2")
-JOINED_ROOM=$(echo "$RESPONSE_JOIN_ROOM" | jq -r '.room_id')
-echo "joined room: $JOINED_ROOM"
+# RESPONSE_JOIN_ROOM=$(curl -s -X GET http://localhost:3000/api/join-room/$LOBBY_ALL_ROOMS_1 --cookie "session_token=$SESSION_TOKEN2")
+# JOINED_ROOM=$(echo "$RESPONSE_JOIN_ROOM" | jq -r '.room_id')
+# echo "joined room: $JOINED_ROOM"
 

@@ -208,7 +208,7 @@ checkSessionActionT logAction = do
   maySessionId <- getCookie "session_token"
   case maySessionId of
     Nothing -> do
-      logAction InfoS "session is not active "
+      logAction InfoS "session is not active"
       json $ jsonResponce [("error", "unauthorized")]
       pure Nothing
     Just sId -> do

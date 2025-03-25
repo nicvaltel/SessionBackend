@@ -48,6 +48,10 @@ routes cachingStrategy= do
 
   get "/create-room" $ file "static/html/create-room.html"
 
+  get "/lobby" $ file "static/html/lobby.html"
+
+  get "/game/:game_id" $ file "static/html/game.html"
+
   notFound $ do
     status status404
     text "Not found"
@@ -56,6 +60,12 @@ routes cachingStrategy= do
     lift $ $(logTM) ErrorS $ "Unhandeled error: " <> ls (show e)
     status status500
     text "InternalServerError"
+
+-- -- Serve static files with proper MIME type
+-- serveStatic :: FilePath -> ActionM ()
+-- serveStatic path = do
+--     setHeader "Content-Type" $ defaultMimeLookup path
+--     file path
 
 
 -- test :: IO ()
