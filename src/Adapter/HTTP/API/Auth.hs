@@ -43,6 +43,9 @@ routes = do
 
   get "/api/verify/:v_code" (getVerify "get /api/verify")
 
+  get "/api/check-room/:room_id" (getCheckRoom "/api/check-room/")
+  
+  
   -- get user
   get "/api/users" $ do
     pure ()
@@ -202,6 +205,18 @@ getVerify namespace = do
       logAction InfoS $ "email verification successful, vcode =" <> ls vCode
       json $ object ["message" .= ("email verification successful" :: Text)]
       
+
+getCheckRoom :: EndPointMonad m => Text -> ActionT m ()
+getCheckRoom namespace = do
+  roomId :: Text <- pathParam "room_id"
+  let logAction = logAction' (Namespace [namespace <> roomId])
+  mayRoomId <- lift $ checkLobbyRoomIsGameStarted (LobbyRoomId roomId)
+  case mayRoomId of
+    Nothing -> json $ object ["message" .= ("" :: Text)]
+    Just (RoomId rId) -> do
+      logAction InfoS ("roomId of started room sended to host, roomId=" <> ls rId)
+      json $ object ["room_id" .= rId]
+
 
 checkSessionActionT :: (MonadIO m, SessionRepo m) => (Severity -> LogStr -> ActionT m ()) -> ActionT m (Maybe (UserId, SessionId))
 checkSessionActionT logAction = do

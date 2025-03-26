@@ -46,6 +46,7 @@ instance RoomRepo App where
   getOpenRooms = Mem.getOpenRooms
   joinRoom = Mem.joinRoom
   closeRoom = Mem.closeRoom
+  checkLobbyRoomIsGameStarted = Mem.checkLobbyRoomIsGameStarted
   
   
 

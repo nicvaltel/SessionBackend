@@ -209,6 +209,20 @@ closeRoom roomId = do
         lift $ writeTVar tvar state{stateRooms = newRooms, stateArchiveRooms = newArchiveRooms}
         pure acrhiveRoomId 
 
+
+checkLobbyRoomIsGameStarted :: InMemory r m => D.LobbyRoomId -> m (Maybe D.RoomId)
+checkLobbyRoomIsGameStarted (D.LobbyRoomId rId) = do
+  let roomId = D.RoomId rId
+  tvar <- asks getter
+  liftIO $ atomically $ do
+    state <- readTVar tvar
+    case Map.lookup roomId (stateRooms state) of
+      Nothing -> pure Nothing
+      Just _ -> pure (Just roomId)
+
+
+--------------------------------------------------------------
+
 runTest :: IO ()
 runTest = do
   let email = D.mkEmail "hello@test.com"

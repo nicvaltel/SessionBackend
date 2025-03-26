@@ -57,6 +57,7 @@ class Monad m => RoomRepo m where
   getOpenRooms :: m [LobbyRoomId]
   joinRoom :: UserGuest  -> LobbyRoomId -> m (Either JoinRoomError RoomId)
   closeRoom :: RoomId -> m (Either CloseRoomError ArchiveRoomId)
+  checkLobbyRoomIsGameStarted :: LobbyRoomId -> m (Maybe RoomId)
 
 
 data GameParams = GameParamsCasual | GameParamsRated
