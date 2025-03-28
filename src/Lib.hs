@@ -17,7 +17,7 @@ import Control.Exception.Safe (MonadThrow, MonadCatch)
 import qualified Prelude
 import qualified Adapter.HTTP.Main as HTTP
 import Domain.Room (RoomRepo(..))
-
+import qualified Adapter.WebSocket.WebSocketServer as WSS
 
 
 -- type AppState = (PG.State, RDS.State, MQ.State, TVar Mem.State) -- Try change Mem.MemState to TVar Mem.State
@@ -38,6 +38,7 @@ instance EmailVerificationNotif App where
 
 instance SessionRepo App where
   newSession = Mem.newSession
+  addWSConnection = Mem.addWSConnection
   endSession = Mem.endSession
   findUserIdBySessionId = Mem.findUserIdBySessionId
 
@@ -73,13 +74,16 @@ runRoutine = do
   withState $ \port le appState -> do
     let runner = runState le appState
     -- MQAuth.init mqState runner
+    WSS.runWebSocketServer runner
     HTTP.main port runner
+
 
 runRoutine' :: IO ()
 runRoutine' = do
   withStateTest' $ \port le appState -> do
     let runner = runState le appState
     -- MQAuth.init mqState runner
+    WSS.runWebSocketServer runner
     HTTP.main port runner
 
 

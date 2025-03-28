@@ -33,6 +33,8 @@ library
       Adapter.HTTP.Main
       Adapter.HTTP.Web.Main
       Adapter.InMemory.Auth
+      Adapter.WebSocket.WebSocketServer
+      Adapter.WebSocket.WebSocketServerExample
       Domain.Auth
       Domain.Room
       Domain.Validation

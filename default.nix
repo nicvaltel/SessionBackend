@@ -31,6 +31,7 @@ in
       pkgs.haskellPackages.postgresql-libpq
 
       pkgs.nodePackages.live-server
+      pkgs.websocat # Websocat is a command-line utility that can help you test WebSocket connections
     ];
 }
 

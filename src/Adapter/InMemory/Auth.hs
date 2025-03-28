@@ -15,6 +15,7 @@ import Control.Monad.Except ( runExceptT, MonadError(throwError) )
 import Text.StringRandom (stringRandomIO)
 import qualified Domain.Room as D
 import Adapter.Email.SendMail (sendMail)
+import qualified Network.WebSockets as WS
 
 
 
@@ -26,12 +27,12 @@ data State = State
   , stateVerifiedEmails :: Set D.Email
   , stateUserIdCounter :: Int
   , stateNotifications :: Map D.Email D.VerificationCode
-  , stateSessions :: Map D.SessionId D.UserId
+  , stateSessions :: Map D.SessionId (D.UserId, Maybe WS.Connection)
   , stateLobbyRooms :: [(D.LobbyRoomId, D.UserHost)]
   , stateRooms :: Map D.RoomId D.RoomData
   , stateUsersRooms :: Map D.UserId D.RoomId
   , stateArchiveRooms :: Map D.ArchiveRoomId D.RoomData
-  } deriving (Show, Eq)
+  }
 
 
 initialState :: State
@@ -53,7 +54,7 @@ findUserIdBySessionId :: InMemory r m => D.SessionId -> m (Maybe D.UserId)
 findUserIdBySessionId sId = do
   tvar <- asks getter
   state <- liftIO $ readTVarIO tvar 
-  pure $ Map.lookup sId (stateSessions state)
+  pure $ fst <$> Map.lookup sId (stateSessions state)
  
 
 newSession :: InMemory r m => D.UserId -> m D.SessionId
@@ -63,10 +64,20 @@ newSession uId = do
   liftIO $ atomically $ do
     state <- readTVar tvar
     let sessions = stateSessions state
-        newSessions = Map.insert sId uId sessions
+        newSessions = Map.insert sId (uId, Nothing) sessions
         newState = state { stateSessions = newSessions }
     writeTVar tvar newState
     pure sId
+
+addWSConnection :: InMemory r m => D.SessionId -> WS.Connection -> m ()
+addWSConnection sId wsConn = do
+  tvar <- asks getter 
+  liftIO $ atomically $ do
+    state <- readTVar tvar
+    let sessions = stateSessions state
+        newSessions = Map.adjust (\(uId,_) -> (uId, Just wsConn)) sId sessions
+        newState = state { stateSessions = newSessions }
+    writeTVar tvar newState
 
 endSession :: InMemory r m => D.SessionId -> m ()
 endSession sId = do

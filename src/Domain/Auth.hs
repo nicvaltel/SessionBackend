@@ -31,6 +31,7 @@ import Text.Regex.PCRE.Heavy
 import Domain.Validation
 import Control.Monad.Except (runExceptT, ExceptT (ExceptT), MonadError (throwError))
 import Katip
+import qualified Network.WebSockets as WS
 
 type VerificationCode = Text
 
@@ -81,6 +82,7 @@ class Monad m => AuthRepo m where
 
 class Monad m => SessionRepo m where
   newSession :: UserId -> m SessionId
+  addWSConnection :: SessionId -> WS.Connection -> m ()
   endSession :: SessionId -> m ()
   findUserIdBySessionId :: SessionId -> m (Maybe UserId)
 
