@@ -13,9 +13,23 @@ wsAction :: (MonadIO m, SessionRepo m) => WS.Connection -> m ()
 wsAction conn = do
   let sId = "666777888" :: SessionId
   addWSConnection sId conn
-  pure ()
+
+  let pingTime = 1000 :: Int
+  liftIO $ WS.withPingThread conn pingTime (pure ()) $ do
+    catch
+      (wsThreadMessageListener conn sId)
+      (\(e :: SomeException) -> putStrLn ("WebSocket thread error: " <> tshow e) >> disconnect sId)
+    where
+
+      disconnect sId = do
+        putStrLn $ sId <> " disconnected"
 
 
+wsThreadMessageListener :: WS.Connection -> SessionId -> IO ()
+wsThreadMessageListener conn sId = forever $ do
+    msg  <- WS.receiveData conn
+    WS.sendTextData conn ("Hi there!11" :: Text)
+    putStrLn $ "RECIEVE #(" <> sId <> "): " <> msg
 
 
 
@@ -26,7 +40,6 @@ wsServer action = \pendingConn -> do
   putStrLn "WebSocket connection established."
   
   action conn
-  
   -- Ensure the connection is properly closed when the action is complete
   finally
     (do

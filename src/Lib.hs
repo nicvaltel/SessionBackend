@@ -18,6 +18,7 @@ import qualified Prelude
 import qualified Adapter.HTTP.Main as HTTP
 import Domain.Room (RoomRepo(..))
 import qualified Adapter.WebSocket.WebSocketServer as WSS
+import Control.Concurrent (forkIO)
 
 
 -- type AppState = (PG.State, RDS.State, MQ.State, TVar Mem.State) -- Try change Mem.MemState to TVar Mem.State
@@ -74,7 +75,7 @@ runRoutine = do
   withState $ \port le appState -> do
     let runner = runState le appState
     -- MQAuth.init mqState runner
-    WSS.runWebSocketServer runner
+    _ <- forkIO $ WSS.runWebSocketServer runner
     HTTP.main port runner
 
 
@@ -83,7 +84,7 @@ runRoutine' = do
   withStateTest' $ \port le appState -> do
     let runner = runState le appState
     -- MQAuth.init mqState runner
-    WSS.runWebSocketServer runner
+    _ <- forkIO $ WSS.runWebSocketServer runner
     HTTP.main port runner
 
 
