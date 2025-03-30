@@ -11,11 +11,11 @@ module Domain.Auth
   , SessionRepo(..)
   , EmailVerificationError(..)
   , LoginError(..)
+  , SessionError(..)
   , VerificationCode
   , SessionId
   , UserId
   , getUser
-  , resolveSessionId
   , login
   , verifyEmail
   , register
@@ -24,6 +24,7 @@ module Domain.Auth
   , loginViaEmailAndPassword
   , logout
   , registerViaEmailPassword
+  , resolveSessionId
   ) where
 
 import ClassyPrelude
@@ -56,6 +57,9 @@ data EmailVerificationError = EmailVerificationErrorInvalidCode
 data LoginError =  LoginErrorInvalidAuth | LoginErrorEmailNotVerified
   deriving (Show, Eq)
 
+data SessionError = SessionErrorSessionIsNotActive
+  deriving (Show, Eq)
+
 newtype Email = Email {emailRaw :: Text} deriving (Show, Eq, Ord)
 
 
@@ -82,9 +86,9 @@ class Monad m => AuthRepo m where
 
 class Monad m => SessionRepo m where
   newSession :: UserId -> m SessionId
-  addWSConnection :: SessionId -> WS.Connection -> m ()
+  addWSConnection :: SessionId -> WS.Connection -> m (Either SessionError ())
   endSession :: SessionId -> m ()
-  findUserIdBySessionId :: SessionId -> m (Maybe UserId)
+  findUserIdBySessionId :: SessionId -> m (Maybe (UserId, Maybe WS.Connection))
 
 class Monad m => EmailVerificationNotif m where
   notifyEmailVerification :: Email -> VerificationCode -> m ()
@@ -143,4 +147,4 @@ getUser :: AuthRepo m => UserId -> m (Maybe Email)
 getUser = findEmailFromUserId
 
 resolveSessionId :: SessionRepo m => SessionId -> m (Maybe UserId)
-resolveSessionId = findUserIdBySessionId
+resolveSessionId sId = (fst <$>) <$> findUserIdBySessionId sId

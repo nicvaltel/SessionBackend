@@ -50,11 +50,11 @@ initialState = State
   }
 
 
-findUserIdBySessionId :: InMemory r m => D.SessionId -> m (Maybe D.UserId)
+findUserIdBySessionId :: InMemory r m => D.SessionId -> m (Maybe (D.UserId, Maybe WS.Connection))
 findUserIdBySessionId sId = do
   tvar <- asks getter
   state <- liftIO $ readTVarIO tvar 
-  pure $ fst <$> Map.lookup sId (stateSessions state)
+  pure $ Map.lookup sId (stateSessions state)
  
 
 newSession :: InMemory r m => D.UserId -> m D.SessionId
@@ -69,15 +69,21 @@ newSession uId = do
     writeTVar tvar newState
     pure sId
 
-addWSConnection :: InMemory r m => D.SessionId -> WS.Connection -> m ()
+addWSConnection :: InMemory r m => D.SessionId -> WS.Connection -> m (Either D.SessionError ())
 addWSConnection sId wsConn = do
   tvar <- asks getter 
+  state <- liftIO $ readTVarIO tvar
+  liftIO $ print $ Map.keys (stateSessions state)
   liftIO $ atomically $ do
     state <- readTVar tvar
     let sessions = stateSessions state
-        newSessions = Map.adjust (\(uId,_) -> (uId, Just wsConn)) sId sessions
-        newState = state { stateSessions = newSessions }
-    writeTVar tvar newState
+    if Map.member sId sessions
+      then do
+        let newSessions = Map.adjust (\(uId,_) -> (uId, Just wsConn)) sId sessions
+            newState = state { stateSessions = newSessions }
+        writeTVar tvar newState
+        pure (Right ())
+      else pure (Left D.SessionErrorSessionIsNotActive)
 
 endSession :: InMemory r m => D.SessionId -> m ()
 endSession sId = do
@@ -185,24 +191,24 @@ getOpenRooms = do
   pure $ map fst $ stateLobbyRooms state
 
 
-joinRoom :: InMemory r m => D.UserGuest -> D.LobbyRoomId -> m (Either D.JoinRoomError D.RoomId)
-joinRoom guestId lobbyRoomId = do
+joinRoom :: InMemory r m => D.UserGuest -> D.LobbyRoomId -> m (Either D.JoinRoomError (D.RoomId, D.UserHost))
+joinRoom guest lobbyRoomId = do
   tvar <- asks getter
   let roomId = D.lobbyRoomIdToRoomId lobbyRoomId
   liftIO $ atomically $ runExceptT $ do
     state <- lift $ readTVar tvar
     case Prelude.lookup lobbyRoomId (stateLobbyRooms state) of
       Nothing -> throwError D.JoinRoomErrorRoomDoesntExist
-      Just hostId -> do
-        let roomData = D.newRoomData hostId guestId
+      Just host -> do
+        let roomData = D.newRoomData host guest
         let newLobbyRooms = filter (\(lrId,_) -> lobbyRoomId /= lrId) (stateLobbyRooms state)
         let newRooms = Map.insert roomId roomData(stateRooms state)
         let newUsersRooms = 
-              Map.insert (D.unUserHost hostId) roomId $ 
-              Map.insert (D.unUserGuest guestId) roomId $
+              Map.insert (D.hostId host) roomId $ 
+              Map.insert (D.guestId guest) roomId $
               stateUsersRooms state
         lift $ writeTVar tvar state{stateLobbyRooms = newLobbyRooms, stateRooms = newRooms, stateUsersRooms = newUsersRooms}
-        pure roomId 
+        pure (roomId, host)
 
 
 closeRoom :: InMemory r m => D.RoomId -> m (Either D.CloseRoomError D.ArchiveRoomId)
@@ -248,5 +254,5 @@ runTest = do
       sId <- newSession 1
       uId <- findUserIdBySessionId sId
       pure (vCode, user, email', sId, uId)
-  print res0
+  -- print res0
   pure ()

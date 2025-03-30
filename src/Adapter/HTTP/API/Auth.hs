@@ -12,7 +12,9 @@ import Katip
 import Data.Aeson -- ( object, KeyValue((.=)), Value (..), Result (..), fromJSON )
 import Data.Aeson.Types (parseMaybe)
 import Web.Scotty.Cookie (deleteCookie)
-import Domain.Room (RoomRepo(..), UserHost (..), LobbyRoomId (..), UserGuest (UserGuest), JoinRoomError (..), RoomId (..), GameParams(..))
+import Domain.Room (RoomRepo(..), UserHost (..), LobbyRoomId (..), UserGuest (..), JoinRoomError (..), RoomId (..), GameParams(..))
+import qualified Network.WebSockets.Connection as WS
+import Adapter.WebSocket.WebSocketServer (wsSendGuestJoinedGameRoom)
 
 
 type EndPointMonad m = (MonadUnliftIO m, KatipContext m, AuthRepo m, SessionRepo m, RoomRepo m)
@@ -109,7 +111,7 @@ getSession namespace = do
   maySession <- checkSessionActionT logAction
   case maySession of
     Nothing -> pure ()
-    Just (uId, sId) -> do
+    Just (uId, sId, _) -> do
       logAction InfoS $ ls $ "session is active " <> sId
       json $ jsonResponce [("message", "session active"), ("user_id", tshow uId)]
 
@@ -131,9 +133,12 @@ postCreateRoom namespace = do
           maySession <- checkSessionActionT logAction
           case maySession of
             Nothing -> pure ()
-            Just (uId, sId) -> do
-              (LobbyRoomId roomId) <- lift $ createRoom (UserHost uId)
-              logAction InfoS $ ls $ "room created by userId=" <> tshow uId <> ", sessionId=" <> sId <> ", lobbyRoomId =" <> roomId
+            Just (hostId, sId, Nothing) -> do
+              logAction WarningS $ ls $ "attempt to create room without active websocket connection userId=" <> tshow hostId <> ", sessionId=" <> sId
+              json $ jsonResponce [("error", "websocket connection is not active")]
+            Just (hostId, sId, Just hostConn) -> do
+              (LobbyRoomId roomId) <- lift $ createRoom UserHost{hostId , hostConn}
+              logAction InfoS $ ls $ "room created by userId=" <> tshow hostId <> ", sessionId=" <> sId <> ", lobbyRoomId =" <> roomId
               json $ jsonResponce [("lobby_room_id", roomId)]
 
 
@@ -155,13 +160,17 @@ getJoinRoom namespace = do
   maySession <- checkSessionActionT logAction
   case maySession of
     Nothing -> pure ()
-    Just (uId, _) -> do
-      eitherRoomId <- lift $ joinRoom (UserGuest uId) (LobbyRoomId roomId)
+    Just (guestId, sId, Nothing) -> do
+      logAction WarningS $ ls $ "attempt to join room without active websocket connection userId=" <> tshow guestId <> ", sessionId=" <> sId
+      json $ jsonResponce [("error", "websocket connection is not active")]
+    Just (guestId, _, Just guestConn) -> do
+      eitherRoomId <- lift $ joinRoom UserGuest{guestId, guestConn} (LobbyRoomId roomId)
       case eitherRoomId of
         Left JoinRoomErrorRoomDoesntExist -> do
           logAction InfoS "room is not active"
           json $ object ["error" .= ("room is not active" :: Text)]
-        Right (RoomId rId) -> do
+        Right (RoomId rId, host) -> do
+          liftIO $ wsSendGuestJoinedGameRoom (hostConn host) (RoomId rId)
           logAction InfoS ("room started, roomId=" <> ls rId)
           json $ object ["room_id" .= rId]
 
@@ -218,7 +227,7 @@ getCheckRoom namespace = do
       json $ object ["room_id" .= rId]
 
 
-checkSessionActionT :: (MonadIO m, SessionRepo m) => (Severity -> LogStr -> ActionT m ()) -> ActionT m (Maybe (UserId, SessionId))
+checkSessionActionT :: (MonadIO m, SessionRepo m) => (Severity -> LogStr -> ActionT m ()) -> ActionT m (Maybe (UserId, SessionId, Maybe WS.Connection))
 checkSessionActionT logAction = do
   maySessionId <- getCookie "session_token"
   case maySessionId of
@@ -227,14 +236,14 @@ checkSessionActionT logAction = do
       json $ jsonResponce [("error", "unauthorized")]
       pure Nothing
     Just sId -> do
-      mayUserId <- lift $ findUserIdBySessionId sId
-      case mayUserId of
+      mayUserIdConn <- lift $ findUserIdBySessionId sId
+      case mayUserIdConn of
         Nothing -> do
           deleteCookie "session_token"
           logAction InfoS "session is not active "
           json $ jsonResponce [("error", "unauthorized")]
           pure Nothing
-        Just uId -> pure (Just (uId, sId))
+        Just (uId, mayConn) -> pure (Just (uId, sId, mayConn))
 
         
 extractCredentials :: Value -> Maybe (Text,Text)

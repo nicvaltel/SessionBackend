@@ -2,27 +2,43 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant lambda" #-}
 -- websocat -v ws://127.0.0.1:1234
-module Adapter.WebSocket.WebSocketServer (initWebSocketServer, runWebSocketServer) where
+module Adapter.WebSocket.WebSocketServer 
+  ( initWebSocketServer, 
+    runWebSocketServer, 
+    wsSendGuestJoinedGameRoom
+  ) where
 
 import ClassyPrelude
 import qualified Network.WebSockets as WS
 import Domain.Auth
+import qualified Data.Text as T
+import Domain.Room (RoomId (..))
 
+pingTime :: Int
+pingTime = 1000
 
 wsAction :: (MonadIO m, SessionRepo m) => WS.Connection -> m ()
 wsAction conn = do
-  let sId = "666777888" :: SessionId
-  addWSConnection sId conn
+  msg :: Text <- liftIO $ WS.receiveData conn
+  case T.breakOn "::" msg of
+    ("session_id",sId') -> do
+      let sId = T.init $ T.drop (T.length "::") sId'
+      print sId
+      addWSResult <- addWSConnection sId conn
+      case addWSResult of
+        Left SessionErrorSessionIsNotActive -> liftIO $ WS.sendTextData conn ("websocket handshake error: session is not active" :: Text)
+        Right () -> liftIO $ WS.withPingThread conn pingTime (pure ()) $ do
+            liftIO $ WS.sendTextData conn ("ok" :: Text)
+            catch
+              (wsThreadMessageListener conn sId)
+              (\(e :: SomeException) -> putStrLn ("WebSocket thread error: " <> tshow e) >> disconnect sId)
 
-  let pingTime = 1000 :: Int
-  liftIO $ WS.withPingThread conn pingTime (pure ()) $ do
-    catch
-      (wsThreadMessageListener conn sId)
-      (\(e :: SomeException) -> putStrLn ("WebSocket thread error: " <> tshow e) >> disconnect sId)
-    where
+    _ -> liftIO $ WS.sendTextData conn ("websocket handshake error: no session_id provided" :: Text)
 
-      disconnect sId = do
-        putStrLn $ sId <> " disconnected"
+  where
+
+    disconnect sId = do
+      putStrLn $ sId <> " disconnected"
 
 
 wsThreadMessageListener :: WS.Connection -> SessionId -> IO ()
@@ -62,6 +78,11 @@ initWebSocketServer port action = do
 
 runWebSocketServer :: (MonadUnliftIO m, SessionRepo m) => (m () -> IO ()) -> IO ()
 runWebSocketServer runner = initWebSocketServer 1234 (runner . wsAction)
+
+
+wsSendGuestJoinedGameRoom :: WS.Connection -> RoomId -> IO ()
+wsSendGuestJoinedGameRoom conn (RoomId rId) =
+  WS.sendTextData conn ("guest_joined_room::" <> rId)
 
 
 -- runWebSocketServer :: (MonadUnliftIO m, SessionRepo m) => (m () -> IO ()) -> IO ()

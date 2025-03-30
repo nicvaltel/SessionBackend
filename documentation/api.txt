@@ -19,6 +19,7 @@ fail:
   [("error", "unauthorized")]
   [("error" , "no json provided")],
   [("error" , "json is not a game data")]
+  [("error", "websocket connection is not active")]
 success: 
   [("lobby_room_id", roomId)]
 
@@ -34,6 +35,7 @@ get "/api/join-room/:room_id"
 fail:
   [("error", "unauthorized")]
   [("error", "room is not active")]
+  [("error", "websocket connection is not active")]
 success:
   [("room_id",rId)]
   

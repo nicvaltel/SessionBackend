@@ -18,6 +18,7 @@ module Domain.Room
 
 import ClassyPrelude
 import Domain.Auth (UserId)
+import qualified Network.WebSockets as WS
 
 newtype RoomId = RoomId Text
   deriving (Show, Eq, Ord)
@@ -28,11 +29,9 @@ newtype LobbyRoomId = LobbyRoomId {unLobbyRoomId :: Text}
 newtype ArchiveRoomId = ArchiveRoomId Text
   deriving (Show, Eq, Ord)
   
-newtype UserHost = UserHost {unUserHost :: UserId}
-  deriving (Show, Eq, Ord)
+data UserHost = UserHost {hostId :: UserId, hostConn :: WS.Connection}
 
-newtype UserGuest = UserGuest {unUserGuest :: UserId}
-  deriving (Show, Eq, Ord)
+data UserGuest = UserGuest {guestId :: UserId, guestConn :: WS.Connection}
 
 data JoinRoomError = JoinRoomErrorRoomDoesntExist
   deriving (Show, Eq, Ord)
@@ -41,7 +40,7 @@ data CloseRoomError = CloseRoomErrorRoomDoesntExist
   deriving (Show, Eq, Ord)
 
 data RoomData = RoomData {userHost :: UserHost, userGuest :: UserGuest}
-  deriving (Show, Eq, Ord)
+
 
 newRoomData :: UserHost -> UserGuest -> RoomData
 newRoomData hostId guestId = RoomData {userHost = hostId, userGuest = guestId}
@@ -55,7 +54,7 @@ roomIdToAcrhiveRoomId (RoomId roomId) = ArchiveRoomId roomId
 class Monad m => RoomRepo m where
   createRoom :: UserHost -> m LobbyRoomId
   getOpenRooms :: m [LobbyRoomId]
-  joinRoom :: UserGuest  -> LobbyRoomId -> m (Either JoinRoomError RoomId)
+  joinRoom :: UserGuest  -> LobbyRoomId -> m (Either JoinRoomError (RoomId, UserHost))
   closeRoom :: RoomId -> m (Either CloseRoomError ArchiveRoomId)
   checkLobbyRoomIsGameStarted :: LobbyRoomId -> m (Maybe RoomId)
 
