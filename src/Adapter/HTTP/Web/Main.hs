@@ -46,8 +46,6 @@ routes cachingStrategy= do
 
   get "/login" $ file "static/html/login.html"
 
-  get "/create-room" $ file "static/html/create-room.html"
-
   get "/lobby" $ file "static/html/lobby.html"
 
   get "/game/:game_id" $ file "static/html/game.html"

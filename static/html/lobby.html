@@ -4,11 +4,18 @@
 <head>
     <title>Lobby</title>
     <script src="script/lobby.js" defer></script>
-    <script src="script/common.js" defer></script>
 </head>
 <body>
     <h1>Lobby</h1>
     <a href="index">Home</a>
     <ul id="lobbyList"></ul>
+
+    <label for="gameType">Select Game Type:</label>
+    <select id="gameType">
+        <option value="casual">Casual</option>
+        <option value="rated">Rated</option>
+    </select>
+    <button onclick="createRoom()">Create Game</button>
+    <p id="roomMessage"></p>
 </body>
 </html>
