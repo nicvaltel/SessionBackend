@@ -5,7 +5,7 @@ fail:
   [("error" , "json is not an auth")],
   [("error" , "invalid credentials")],
   [("error" , "email not verified")]
-success: [("message" , "login successful"), ("session_token", sessionId)]
+success: [("message" , "login successful"), ("session_id", sessionId)]
 
 post "/api/logout"
 

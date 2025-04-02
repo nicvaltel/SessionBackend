@@ -8,6 +8,9 @@ function login() {
   })
   .then(response => response.json())
   .then(data => {
+      if (data.session_id){
+        localStorage.setItem("session_id", data.session_id);
+      }
       document.getElementById("loginMessage").textContent = data.message || data.error;
   })
   .catch(error => console.error("Error:", error));

@@ -72,8 +72,6 @@ newSession uId = do
 addWSConnection :: InMemory r m => D.SessionId -> WS.Connection -> m (Either D.SessionError ())
 addWSConnection sId wsConn = do
   tvar <- asks getter 
-  state <- liftIO $ readTVarIO tvar
-  liftIO $ print $ Map.keys (stateSessions state)
   liftIO $ atomically $ do
     state <- readTVar tvar
     let sessions = stateSessions state

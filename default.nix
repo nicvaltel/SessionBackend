@@ -32,6 +32,9 @@ in
 
       pkgs.nodePackages.live-server
       pkgs.websocat # Websocat is a command-line utility that can help you test WebSocket connections
+
+      pkgs.python310Packages.websockets
+      pkgs.python310Packages.requests
     ];
 }
 

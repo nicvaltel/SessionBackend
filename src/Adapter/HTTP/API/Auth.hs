@@ -28,16 +28,16 @@ routes = do
 
   post "/api/logout" (postLogout "post /api/logout" )
 
-  -- curl -i -v --cookie "session_token=sId" -X GET http://localhost:3000/api/session
+  -- curl -i -v --cookie "session_id=sId" -X GET http://localhost:3000/api/session
   get "/api/session" (getSession "get /api/session")
 
-  -- curl -i -v --cookie "session_token=sId" -X POST http://localhost:3000/api/create-room
+  -- curl -i -v --cookie "session_id=sId" -X POST http://localhost:3000/api/create-room
   post "/api/create-room" (postCreateRoom "post /api/create-room")
 
-  -- curl -i -v --cookie "session_token=sId" -X GET http://localhost:3000/api/lobby
+  -- curl -i -v --cookie "session_id=sId" -X GET http://localhost:3000/api/lobby
   get "/api/lobby" (getLobby "get /api/lobby")
 
-  -- curl -i -v --cookie "session_token=sId" -X GET http://localhost:3000/api/join-room/:room_id
+  -- curl -i -v --cookie "session_id=sId" -X GET http://localhost:3000/api/join-room/:room_id
   get "/api/join-room/:room_id" (getJoinRoom "/api/join-room/")
 
   -- register
@@ -81,8 +81,8 @@ postLogin namespace = do
               json $ jsonResponce [("error" , "email not verified")]
             Right sessionId -> do
               -- log InfoS in loginViaEmailAndPassword function
-              setCookieDefault "session_token" (encodeUtf8 sessionId) True
-              json $ jsonResponce [("message" , "login successful"), ("session_token", sessionId)]
+              setCookieDefault "session_id" (encodeUtf8 sessionId) True
+              json $ jsonResponce [("message" , "login successful"), ("session_id", sessionId)]
 
 
 postLogout :: EndPointMonad m => Namespace -> ActionT m ()
@@ -101,7 +101,7 @@ postLogout namespace = do
         Just sId -> do
           lift $ logout sId
           -- log InfoS in logout function
-          deleteCookie "session_token"
+          deleteCookie "session_id" -- TODO delete local storage
           json $ jsonResponce [ ("message" , "logged out successfully")]
 
 
@@ -229,7 +229,7 @@ getCheckRoom namespace = do
 
 checkSessionActionT :: (MonadIO m, SessionRepo m) => (Severity -> LogStr -> ActionT m ()) -> ActionT m (Maybe (UserId, SessionId, Maybe WS.Connection))
 checkSessionActionT logAction = do
-  maySessionId <- getCookie "session_token"
+  maySessionId <- getCookie "session_id"
   case maySessionId of
     Nothing -> do
       logAction InfoS "session is not active"
@@ -239,7 +239,7 @@ checkSessionActionT logAction = do
       mayUserIdConn <- lift $ findUserIdBySessionId sId
       case mayUserIdConn of
         Nothing -> do
-          deleteCookie "session_token"
+          deleteCookie "session_id" -- TODO delete local storage
           logAction InfoS "session is not active "
           json $ jsonResponce [("error", "unauthorized")]
           pure Nothing

@@ -13,17 +13,27 @@ import qualified Network.WebSockets as WS
 import Domain.Auth
 import qualified Data.Text as T
 import Domain.Room (RoomId (..))
+import Katip
 
 pingTime :: Int
 pingTime = 1000
 
-wsAction :: (MonadIO m, SessionRepo m) => WS.Connection -> m ()
+
+wsSendGuestJoinedGameRoom :: WS.Connection -> RoomId -> IO ()
+wsSendGuestJoinedGameRoom conn (RoomId rId) =
+  WS.sendTextData conn ("guest_joined_room::" <> rId)
+
+
+
+wsAction :: (SessionRepo m, KatipContext m) => WS.Connection -> m ()
 wsAction conn = do
   msg :: Text <- liftIO $ WS.receiveData conn
   case T.breakOn "::" msg of
     ("session_id",sId') -> do
-      let sId = T.init $ T.drop (T.length "::") sId'
+      let sId = T.init $ T.drop (T.length "::") sId' -- TODO delete "\n" at the end of ws messages
       print sId
+      katipAddNamespace "wsAction" $ $(logTM) WarningS $ ls $ "attempt to join room without active websocket connection userId=" <> tshow 111
+      -- logAction WarningS $ ls $ "attempt to join room without active websocket connection userId=" <> tshow guestId <> ", sessionId=" <> sId
       addWSResult <- addWSConnection sId conn
       case addWSResult of
         Left SessionErrorSessionIsNotActive -> liftIO $ WS.sendTextData conn ("websocket handshake error: session is not active" :: Text)
@@ -76,13 +86,8 @@ initWebSocketServer port action = do
   putStrLn $ "Starting WebSocket server on port " <> tshow port <> "..."
   liftIO $ WS.runServer "0.0.0.0" port (wsServer action)
 
-runWebSocketServer :: (MonadUnliftIO m, SessionRepo m) => (m () -> IO ()) -> IO ()
+runWebSocketServer :: (SessionRepo m, KatipContext m) => (m () -> IO ()) -> IO ()
 runWebSocketServer runner = initWebSocketServer 1234 (runner . wsAction)
-
-
-wsSendGuestJoinedGameRoom :: WS.Connection -> RoomId -> IO ()
-wsSendGuestJoinedGameRoom conn (RoomId rId) =
-  WS.sendTextData conn ("guest_joined_room::" <> rId)
 
 
 -- runWebSocketServer :: (MonadUnliftIO m, SessionRepo m) => (m () -> IO ()) -> IO ()
