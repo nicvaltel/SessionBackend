@@ -31,7 +31,7 @@ echo "joined room: $JOINED_ROOM"
 
 
 # WebSocket-сервер и сообщение
-WS_URL="ws://127.0.0.1:1234"
+WS_URL="ws://localhost:1234"
 WS_SESSION_MSG1="session_id::$SESSION_ID1"
 
 # Отправляем сообщение и получаем ответ

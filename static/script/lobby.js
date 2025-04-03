@@ -1,9 +1,9 @@
-const socket = new WebSocket("ws://127.0.0.1:1234");
+const socket = new WebSocket("ws://localhost:1234");
 
 // At opening
 socket.addEventListener("open", () => {
   console.log("Connected to WebSocket server");
-  const sessionIdMsg = "session_id::" +  localStorage.getItem("session_id") + "\n";
+  const sessionIdMsg = "create_game";
   socket.send(sessionIdMsg);
 });
 
@@ -12,6 +12,7 @@ socket.addEventListener("message", (event) => {
   if (event.data.startsWith("guest_joined_room::")) {
     const roomId = event.data.substring("guest_joined_room::".length);
     console.log("Guest joined room:", roomId);
+    socket.close();
     window.location.href = `/game/${roomId}`;
   } else {
     console.log("Received:", event.data);

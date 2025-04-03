@@ -4,7 +4,7 @@ import asyncio
 import time
 
 BASE_URL = "http://localhost:3000/api"
-WS_URL = "ws://127.0.0.1:1234"
+WS_URL = "ws://localhost:1234"
 
 # Login and get session tokens
 def login(username, password):

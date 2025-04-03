@@ -97,12 +97,12 @@ postLogout namespace = do
       case extractSessionId sessionData of
         Nothing -> do -- json is not a sessionId
           logAction WarningS "json is not a sessionId"
-          json $ jsonResponce [("error" , "json is not a sessionId")]
+          json $ jsonResponce [("error" , "json is not a session_id")]
         Just sId -> do
           lift $ logout sId
           -- log InfoS in logout function
           deleteCookie "session_id" -- TODO delete local storage
-          json $ jsonResponce [ ("message" , "logged out successfully")]
+          json $ jsonResponce [ ("message" , "logged out successfully"), ("delete_local_storage", "session_id")]
 
 
 getSession :: EndPointMonad m => Namespace -> ActionT m ()
@@ -241,7 +241,7 @@ checkSessionActionT logAction = do
         Nothing -> do
           deleteCookie "session_id" -- TODO delete local storage
           logAction InfoS "session is not active "
-          json $ jsonResponce [("error", "unauthorized")]
+          json $ jsonResponce [("error", "unauthorized"), ("delete_local_storage", "session_id")]
           pure Nothing
         Just (uId, mayConn) -> pure (Just (uId, sId, mayConn))
 
@@ -280,4 +280,4 @@ extractGameParams value = parser value >>= getGameParams
 
 -- Function to extract sessionId from a JSON Value
 extractSessionId :: Value -> Maybe SessionId
-extractSessionId = parseMaybe (withObject "Session" $ \obj -> obj .: "sessionId")
+extractSessionId = parseMaybe (withObject "Session" $ \obj -> obj .: "session_id")

@@ -8,6 +8,11 @@ fail:
 success: [("message" , "login successful"), ("session_id", sessionId)]
 
 post "/api/logout"
+send json : [("session_id" , session_id)]
+fail: 
+  [("error" , "no json provided")],
+  [("error" , "json is not a session_id")],
+success: [ ("message" , "logged out successfully"), ("delete_local_storage", "session_id")]
 
 
 get "/api/session"
