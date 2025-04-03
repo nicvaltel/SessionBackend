@@ -3,28 +3,18 @@ module Adapter.HTTP.Common where
 
 import ClassyPrelude
 import Web.Scotty.Trans
--- import qualified Text.Digestive.Form as DF
--- import qualified Text.Digestive.Types as DF
--- import qualified Text.Digestive.Aeson as DF
--- import Text.Digestive.Form ((.:))
 
-import Data.Aeson hiding (json, (.:))
-import Network.HTTP.Types.Status
 import Blaze.ByteString.Builder (toLazyByteString)
 import Web.Cookie
--- import Data.Text.Lazy (toStrict)
-import ClassyPrelude (decodeUtf8, Utf8 (encodeUtf8))
 import Domain.Auth
 import Data.Time.Lens
 import Katip (KatipContext, katipAddNamespace, Namespace (Namespace))
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 
 type CookieName = ByteString
 type CookieValue = ByteString
 type CookieSecure = Bool
 
-
--- toResult :: Either e a -> DF.Result e a
--- toResult = either DF.Error DF.Success
 
 liftKatipContext :: (KatipContext m) => m a -> ActionT m a
 liftKatipContext = lift . katipAddNamespace (Namespace mempty)
@@ -45,6 +35,17 @@ setCookieDefault cname cval secure = do
     , setCookieSameSite = Just sameSiteLax
     }
 
+deleteCookieDefault :: MonadIO m => CookieName -> CookieSecure -> ActionT m ()
+deleteCookieDefault cname secure =
+  setCookie $ def{
+      setCookieName = cname
+    , setCookiePath = Just "/"
+    , setCookieValue = ""
+    , setCookieExpires = Just $ posixSecondsToUTCTime 0
+    , setCookieHttpOnly = True
+    , setCookieSecure = secure
+    , setCookieSameSite = Just sameSiteLax
+    }
 
 getCookie :: Monad m => Text -> ActionT m (Maybe Text)
 getCookie key = do

@@ -115,8 +115,8 @@ testRoutine' = do
   vCode <- App $ pollNotif email
   -- Just vCode <- App $ Mem.getNotificationsForEmail email
   _ <- verifyEmail vCode
-  Right session <- login auth
-  Just uId <- resolveSessionId session
+  Right (session, uId) <- login auth
+  -- Just uId <- resolveSessionId session
   Just registeredEmail <- getUser uId
   liftIO $ print (session, uId, registeredEmail)
 
@@ -126,8 +126,8 @@ testRoutine' = do
   _ <- register auth2
   vCode2 <- App $ pollNotif email2
   _ <- verifyEmail vCode2
-  Right session2 <- login auth2
-  Just uId2 <- resolveSessionId session2
+  Right (session2, uId2) <- login auth2
+  -- Just uId2 <- resolveSessionId session2
   Just registeredEmail2 <- getUser uId2
   liftIO $ print (session2, uId2, registeredEmail2)
 

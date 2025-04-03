@@ -11,7 +11,6 @@ import Adapter.HTTP.API.Common
 import Katip
 import Data.Aeson -- ( object, KeyValue((.=)), Value (..), Result (..), fromJSON )
 import Data.Aeson.Types (parseMaybe)
-import Web.Scotty.Cookie (deleteCookie)
 import Domain.Room (RoomRepo(..), UserHost (..), LobbyRoomId (..), UserGuest (..), JoinRoomError (..), RoomId (..), GameParams(..))
 import qualified Network.WebSockets.Connection as WS
 import Adapter.WebSocket.WebSocketServer (wsSendGuestJoinedGameRoom)
@@ -26,7 +25,7 @@ routes = do
   -- curl -i -d '{"username":"hello@mail.md", "password":"123456Hello"}' -H "Content-Type: application/json" -X POST http://localhost:3000/api/login
   post "/api/login" (postLogin "post /api/login")
 
-  post "/api/logout" (postLogout "post /api/logout" )
+  get "/api/logout" (getLogout "get /api/logout" )
 
   -- curl -i -v --cookie "session_id=sId" -X GET http://localhost:3000/api/session
   get "/api/session" (getSession "get /api/session")
@@ -79,30 +78,24 @@ postLogin namespace = do
             Left LoginErrorEmailNotVerified -> do
               logAction WarningS ("email not verified: " <> ls uname)
               json $ jsonResponce [("error" , "email not verified")]
-            Right sessionId -> do
+            Right (sessionId, userId) -> do
               -- log InfoS in loginViaEmailAndPassword function
               setCookieDefault "session_id" (encodeUtf8 sessionId) True
-              json $ jsonResponce [("message" , "login successful"), ("session_id", sessionId)]
+              json $ jsonResponce [("message" , "login successful"), ("user_id", tshow userId)]
 
 
-postLogout :: EndPointMonad m => Namespace -> ActionT m ()
-postLogout namespace = do
+getLogout :: EndPointMonad m => Namespace -> ActionT m ()
+getLogout namespace = do
   let logAction = logAction' namespace
-  inputJson :: Value <- jsonData `catch` (\(_:: SomeException) -> pure Null)
-  case inputJson of
-    Null -> do -- not a json
-      logAction WarningS "no json provided"
-      json $ jsonResponce [("error" , "no json provided")]
-    sessionData -> 
-      case extractSessionId sessionData of
-        Nothing -> do -- json is not a sessionId
-          logAction WarningS "json is not a sessionId"
-          json $ jsonResponce [("error" , "json is not a session_id")]
-        Just sId -> do
-          lift $ logout sId
-          -- log InfoS in logout function
-          deleteCookie "session_id" -- TODO delete local storage
-          json $ jsonResponce [ ("message" , "logged out successfully"), ("delete_local_storage", "session_id")]
+  maySession <- checkSessionActionT logAction
+  case maySession of
+    Nothing -> pure ()
+    Just (_, sId, _) -> do
+      -- log InfoS in logout function      
+      deleteCookieDefault "session_id" True
+      lift $ logout sId
+      json $ object ["message" .= ("logout" :: Text)]
+
 
 
 getSession :: EndPointMonad m => Namespace -> ActionT m ()
@@ -233,15 +226,15 @@ checkSessionActionT logAction = do
   case maySessionId of
     Nothing -> do
       logAction InfoS "session is not active"
-      json $ jsonResponce [("error", "unauthorized")]
+      json $ jsonResponce [("error", "unauthorized"), ("delete_local_storage", "user_id")]
       pure Nothing
     Just sId -> do
       mayUserIdConn <- lift $ findUserIdBySessionId sId
       case mayUserIdConn of
         Nothing -> do
-          deleteCookie "session_id" -- TODO delete local storage
+          deleteCookieDefault "session_id" True
           logAction InfoS "session is not active "
-          json $ jsonResponce [("error", "unauthorized"), ("delete_local_storage", "session_id")]
+          json $ jsonResponce [("error", "unauthorized"), ("delete_local_storage", "user_id")]
           pure Nothing
         Just (uId, mayConn) -> pure (Just (uId, sId, mayConn))
 

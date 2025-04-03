@@ -8,10 +8,22 @@ function login() {
   })
   .then(response => response.json())
   .then(data => {
-      // if (data.session_id){
-      //   localStorage.setItem("session_id", data.session_id);
-      // }
+      if (data.user_id){
+        localStorage.setItem("user_id", data.user_id);
+      }
       document.getElementById("loginMessage").textContent = data.message || data.error;
+  })
+  .catch(error => console.error("Error:", error));
+}
+
+function logout() {
+  localStorage.removeItem("user_id");
+  fetch(`http://localhost:3000/api/logout`)
+  .then(response => response.json())
+  .then(data => {
+    if (data.error){
+      console.log(data.error);
+    }
   })
   .catch(error => console.error("Error:", error));
 }

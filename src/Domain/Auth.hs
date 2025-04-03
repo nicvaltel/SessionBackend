@@ -122,7 +122,7 @@ verifyEmail vCode = runExceptT $ do
     $(logTM) InfoS $ ls (emailRaw email) <> " is verified successfully"
 
 
-login :: (KatipContext m, AuthRepo m, SessionRepo m) => Auth -> m (Either LoginError SessionId)
+login :: (KatipContext m, AuthRepo m, SessionRepo m) => Auth -> m (Either LoginError (SessionId, UserId))
 login auth = runExceptT $ do
   result <- lift $ findUserByAuth auth
   case result of
@@ -132,9 +132,9 @@ login auth = runExceptT $ do
       sId <- lift $ newSession uId
       withUserIdContext uId $
         $(logTM) InfoS $ ls (emailRaw $ authEmail auth) <> " logged in successfully"
-      pure sId
+      pure (sId, uId)
 
-loginViaEmailAndPassword :: (KatipContext m, AuthRepo m, SessionRepo m) => Text -> Text -> m (Either LoginError SessionId)
+loginViaEmailAndPassword :: (KatipContext m, AuthRepo m, SessionRepo m) => Text -> Text -> m (Either LoginError (SessionId, UserId))
 loginViaEmailAndPassword email password = login Auth{authEmail = Email email, authPassword = Password password}
 
 logout :: (KatipContext m, SessionRepo m) => SessionId -> m ()
