@@ -11,8 +11,9 @@ module Adapter.WebSocket.WebSocketServer
 import ClassyPrelude
 import qualified Network.WebSockets as WS
 import Domain.Auth
-import Domain.Room (RoomId (..))
+import Domain.Room (RoomId (..), RoomRepo (..), LobbyRoomId (..))
 import Katip
+import Control.Concurrent (threadDelay)
 
 
 pingTime :: Int
@@ -24,8 +25,8 @@ wsSendGuestJoinedGameRoom conn (RoomId rId) =
   WS.sendTextData conn ("guest_joined_room::" <> rId)
 
 
-wsAction :: (SessionRepo m, KatipContext m) => Maybe ByteString -> WS.Connection -> m ()
-wsAction mayCookies conn = do
+wsAction :: (SessionRepo m, KatipContext m, RoomRepo m, MonadUnliftIO m) => (m () -> IO ()) -> Maybe ByteString -> WS.Connection -> m ()
+wsAction runner mayCookies conn = do
   case mayCookies of
     Nothing -> do
       katipAddNamespace "wsAction" $ $(logTM) WarningS $ ls ("attempt to join room without active websocket connection" :: Text)
@@ -37,10 +38,11 @@ wsAction mayCookies conn = do
           addWSResult <- addWSConnection sId conn
           case addWSResult of
             Left SessionErrorSessionIsNotActive -> liftIO $ WS.sendTextData conn ("websocket handshake error: session is not active" :: Text)
-            Right () -> liftIO $ WS.withPingThread conn pingTime (pure ()) $ do
-                liftIO $ WS.sendTextData conn ("ok" :: Text)
+            Right () -> 
+              liftIO $ WS.withPingThread conn pingTime (pure ()) $ do
+                WS.sendTextData conn ("ok" :: Text)
                 catch
-                  (wsThreadMessageListener conn sId)
+                  (runner $ wsThreadMessageListener conn sId)
                   (\(e :: SomeException) -> putStrLn ("WebSocket thread error: " <> tshow e) >> disconnect sId)
         (_,_) -> liftIO $ WS.sendTextData conn ("websocket handshake error: no session_id provided" :: Text)
 
@@ -49,11 +51,22 @@ wsAction mayCookies conn = do
       putStrLn $ sId <> " disconnected"
 
 
-wsThreadMessageListener :: WS.Connection -> SessionId -> IO ()
+wsThreadMessageListener :: (SessionRepo m, RoomRepo m, MonadUnliftIO m) => WS.Connection -> SessionId -> m ()
 wsThreadMessageListener conn sId = forever $ do
-    msg  <- WS.receiveData conn
-    WS.sendTextData conn ("Hi there!11" :: Text)
-    putStrLn $ "RECIEVE #(" <> sId <> "): " <> msg
+    msg  <- liftIO $ WS.receiveData conn
+    case msg of
+      "enter_lobby" -> do
+        liftIO $ WS.sendTextData conn ("Salam!" :: Text)
+        putStrLn $ "RECIEVE ENTER LOBBY #(" <> sId <> "): " <> msg
+        _ <- async $ forever $ do
+            rooms <- getOpenRooms
+            let roomsTxt = intercalate ";" $ map unLobbyRoomId rooms :: Text
+            liftIO $ WS.sendTextData conn ("lobby_list::" <> roomsTxt)
+            liftIO $ threadDelay 1_000_000  -- 1 second
+        pure ()
+      _ -> do
+        liftIO $ WS.sendTextData conn ("Hi there!11" :: Text)
+        putStrLn $ "RECIEVE #(" <> sId <> "): " <> msg
 
 
 -- Define the WebSocket application
@@ -95,6 +108,6 @@ initWebSocketServer port action = do
   liftIO $ WS.runServer "0.0.0.0" port (wsServer action)
 
 
-runWebSocketServer :: (SessionRepo m, KatipContext m) => (m () -> IO ()) -> IO ()
-runWebSocketServer runner = initWebSocketServer 1234 (\bs conn -> runner $ wsAction bs conn)
+runWebSocketServer :: (SessionRepo m, KatipContext m, RoomRepo m, MonadUnliftIO m) => (m () -> IO ()) -> IO ()
+runWebSocketServer runner = initWebSocketServer 1234 (\bs conn -> runner $ wsAction runner bs conn)
 

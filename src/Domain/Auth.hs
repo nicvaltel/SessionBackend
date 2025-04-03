@@ -25,6 +25,8 @@ module Domain.Auth
   , logout
   , registerViaEmailPassword
   , resolveSessionId
+  , mkUnsafePassword
+  , mkEmailUnsafe
   ) where
 
 import ClassyPrelude
@@ -66,6 +68,8 @@ newtype Email = Email {emailRaw :: Text} deriving (Show, Eq, Ord)
 mkEmail :: Text -> Either [Text] Email
 mkEmail emailRaw = Right Email{emailRaw} -- Check email via verification only, without regexp check
 
+mkEmailUnsafe :: Text -> Email
+mkEmailUnsafe = Email
 
 mkPassword :: Text -> Either [Text] Password
 mkPassword = validate Password
@@ -75,6 +79,8 @@ mkPassword = validate Password
     , regexMatches [re|[a-z]|] "Should contain lowercase letter"
     ]
 
+mkUnsafePassword :: Text -> Password
+mkUnsafePassword = Password
 
 
 class Monad m => AuthRepo m where

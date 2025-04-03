@@ -74,6 +74,7 @@ default-extensions:
 - NamedFieldPuns
 - QuasiQuotes
 - TemplateHaskell
+- NumericUnderscores
 
 ghc-options:
 - -Wall
