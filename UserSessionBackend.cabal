@@ -36,6 +36,7 @@ library
       Adapter.WebSocket.WebSocketServer
       Adapter.WebSocket.WebSocketServerExample
       Domain.Auth
+      Domain.Messenger
       Domain.Room
       Domain.Validation
       Lib

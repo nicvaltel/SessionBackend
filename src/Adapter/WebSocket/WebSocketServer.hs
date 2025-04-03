@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant lambda" #-}
--- websocat -v ws://127.0.0.1:1234
+-- websocat -v ws://localhost:1234
 module Adapter.WebSocket.WebSocketServer 
   ( initWebSocketServer, 
     runWebSocketServer, 
@@ -11,9 +11,10 @@ module Adapter.WebSocket.WebSocketServer
 import ClassyPrelude
 import qualified Network.WebSockets as WS
 import Domain.Auth
-import Domain.Room (RoomId (..), RoomRepo (..), LobbyRoomId (..))
+import Domain.Room (RoomId (..), RoomRepo (..))
 import Katip
-import Control.Concurrent (threadDelay)
+import qualified Domain.Messenger as Messenger
+
 
 
 pingTime :: Int
@@ -53,20 +54,7 @@ wsAction runner mayCookies conn = do
 
 wsThreadMessageListener :: (SessionRepo m, RoomRepo m, MonadUnliftIO m) => WS.Connection -> SessionId -> m ()
 wsThreadMessageListener conn sId = forever $ do
-    msg  <- liftIO $ WS.receiveData conn
-    case msg of
-      "enter_lobby" -> do
-        liftIO $ WS.sendTextData conn ("Salam!" :: Text)
-        putStrLn $ "RECIEVE ENTER LOBBY #(" <> sId <> "): " <> msg
-        _ <- async $ forever $ do
-            rooms <- getOpenRooms
-            let roomsTxt = intercalate ";" $ map unLobbyRoomId rooms :: Text
-            liftIO $ WS.sendTextData conn ("lobby_list::" <> roomsTxt)
-            liftIO $ threadDelay 1_000_000  -- 1 second
-        pure ()
-      _ -> do
-        liftIO $ WS.sendTextData conn ("Hi there!11" :: Text)
-        putStrLn $ "RECIEVE #(" <> sId <> "): " <> msg
+    Messenger.messageListener (WS.receiveData conn) (WS.sendTextData conn) sId
 
 
 -- Define the WebSocket application
