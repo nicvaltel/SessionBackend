@@ -38,10 +38,13 @@ messageListener recieveMessage sendMessage sId = do
   case msg of
     InMsgEnterLobby -> do
       putStrLn $ "RECIEVE ENTER LOBBY #(" <> sId <> "): " <> tshow msg
-      _ <- async $ forever $ do
+      asyncTask <- async $ forever $ do
           rooms <- getOpenRooms
           sendMsg $ OutMsgLobbyList rooms
           liftIO $ threadDelay 1_000_000  -- 1 second
-      pure ()
+      eitherErr <- addWSLobbyAsyncTask sId asyncTask
+      case eitherErr of
+        Left SessionErrorSessionIsNotActive -> cancel asyncTask
+        Right () -> pure ()
     InMsgOther -> do
       putStrLn $ "RECIEVE #(" <> sId <> "): " <> tshow msg

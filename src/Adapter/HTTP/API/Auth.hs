@@ -229,14 +229,14 @@ checkSessionActionT logAction = do
       json $ jsonResponce [("error", "unauthorized"), ("delete_local_storage", "user_id")]
       pure Nothing
     Just sId -> do
-      mayUserIdConn <- lift $ findUserIdBySessionId sId
-      case mayUserIdConn of
+      maySD <- lift $ findSessionDataBySessionId sId
+      case maySD of
         Nothing -> do
           deleteCookieDefault "session_id" True
           logAction InfoS "session is not active "
           json $ jsonResponce [("error", "unauthorized"), ("delete_local_storage", "user_id")]
           pure Nothing
-        Just (uId, mayConn) -> pure (Just (uId, sId, mayConn))
+        Just SessionData{sessionDataUserId, sessionDataMayConn} -> pure (Just (sessionDataUserId, sId, sessionDataMayConn))
 
         
 extractCredentials :: Value -> Maybe (Text,Text)

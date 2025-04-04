@@ -91,6 +91,7 @@ library
     , text
     , time
     , time-lens
+    , unliftio
     , wai
     , wai-extra
     , wai-middleware-static
@@ -152,6 +153,7 @@ executable UserSessionBackend-exe
     , text
     , time
     , time-lens
+    , unliftio
     , wai
     , wai-extra
     , wai-middleware-static
@@ -214,6 +216,7 @@ test-suite UserSessionBackend-test
     , text
     , time
     , time-lens
+    , unliftio
     , wai
     , wai-extra
     , wai-middleware-static

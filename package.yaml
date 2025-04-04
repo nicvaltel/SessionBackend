@@ -27,6 +27,7 @@ dependencies:
 - classy-prelude
 - mtl
 - containers
+- unliftio
 - data-has
 - string-random
 - pcre-heavy

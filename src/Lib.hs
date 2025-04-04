@@ -40,8 +40,10 @@ instance EmailVerificationNotif App where
 instance SessionRepo App where
   newSession = Mem.newSession
   addWSConnection = Mem.addWSConnection
+  addWSLobbyAsyncTask = Mem.addWSLobbyAsyncTask
   endSession = Mem.endSession
-  findUserIdBySessionId = Mem.findUserIdBySessionId
+  findSessionDataBySessionId = Mem.findSessionDataBySessionId
+
 
 instance RoomRepo App where
   createRoom = Mem.createRoom

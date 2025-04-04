@@ -27,6 +27,8 @@ module Domain.Auth
   , resolveSessionId
   , mkUnsafePassword
   , mkEmailUnsafe
+  , SessionData(..)
+  , newSessionData
   ) where
 
 import ClassyPrelude
@@ -64,6 +66,13 @@ data SessionError = SessionErrorSessionIsNotActive
 
 newtype Email = Email {emailRaw :: Text} deriving (Show, Eq, Ord)
 
+data SessionData = SessionData 
+  { sessionDataUserId :: UserId
+  , sessionDataMayConn :: Maybe WS.Connection
+  , sessionDataWSLobbyAsyncTask :: Maybe (Async ())}
+
+newSessionData :: UserId -> SessionData
+newSessionData sessionDataUserId = SessionData {sessionDataUserId, sessionDataMayConn = Nothing, sessionDataWSLobbyAsyncTask = Nothing}
 
 mkEmail :: Text -> Either [Text] Email
 mkEmail emailRaw = Right Email{emailRaw} -- Check email via verification only, without regexp check
@@ -93,8 +102,10 @@ class Monad m => AuthRepo m where
 class Monad m => SessionRepo m where
   newSession :: UserId -> m SessionId
   addWSConnection :: SessionId -> WS.Connection -> m (Either SessionError ())
+  addWSLobbyAsyncTask :: SessionId -> Async () -> m (Either SessionError ())
   endSession :: SessionId -> m ()
-  findUserIdBySessionId :: SessionId -> m (Maybe (UserId, Maybe WS.Connection))
+  findSessionDataBySessionId :: SessionId -> m (Maybe SessionData)
+
 
 class Monad m => EmailVerificationNotif m where
   notifyEmailVerification :: Email -> VerificationCode -> m ()
@@ -153,4 +164,4 @@ getUser :: AuthRepo m => UserId -> m (Maybe Email)
 getUser = findEmailFromUserId
 
 resolveSessionId :: SessionRepo m => SessionId -> m (Maybe UserId)
-resolveSessionId sId = (fst <$>) <$> findUserIdBySessionId sId
+resolveSessionId sId = (sessionDataUserId <$>) <$> findSessionDataBySessionId sId

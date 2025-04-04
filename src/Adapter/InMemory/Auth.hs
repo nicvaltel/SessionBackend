@@ -9,7 +9,7 @@ import qualified Prelude
 import qualified Domain.Auth as D
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import Domain.Auth (Auth(authEmail))
+import Domain.Auth (Auth(authEmail), SessionData(..))
 import Data.Has (Has (..))
 import Control.Monad.Except ( runExceptT, MonadError(throwError) )
 import Text.StringRandom (stringRandomIO)
@@ -21,13 +21,16 @@ import qualified Network.WebSockets as WS
 
 type InMemory r m = (Has (TVar State) r, MonadReader r m, MonadIO m)
 
+
+
 data State = State 
   { stateAuth :: [(D.UserId, D.Auth)]
   , stateUnverifiedEmails :: Map D.VerificationCode D.Email
   , stateVerifiedEmails :: Set D.Email
   , stateUserIdCounter :: Int
   , stateNotifications :: Map D.Email D.VerificationCode
-  , stateSessions :: Map D.SessionId (D.UserId, Maybe WS.Connection)
+  , stateSessions :: Map D.SessionId D.SessionData
+  , stateUsersSession :: Map D.UserId D.SessionId
   , stateLobbyRooms :: [(D.LobbyRoomId, D.UserHost)]
   , stateRooms :: Map D.RoomId D.RoomData
   , stateUsersRooms :: Map D.UserId D.RoomId
@@ -43,6 +46,7 @@ initialState = State
   , stateUserIdCounter = 0
   , stateNotifications = Map.empty
   , stateSessions = Map.empty
+  , stateUsersSession = Map.empty
   , stateLobbyRooms = []
   , stateRooms = Map.empty
   , stateUsersRooms = Map.empty
@@ -50,8 +54,8 @@ initialState = State
   }
 
 
-findUserIdBySessionId :: InMemory r m => D.SessionId -> m (Maybe (D.UserId, Maybe WS.Connection))
-findUserIdBySessionId sId = do
+findSessionDataBySessionId :: InMemory r m => D.SessionId -> m (Maybe D.SessionData)
+findSessionDataBySessionId sId = do
   tvar <- asks getter
   state <- liftIO $ readTVarIO tvar 
   pure $ Map.lookup sId (stateSessions state)
@@ -61,13 +65,29 @@ newSession :: InMemory r m => D.UserId -> m D.SessionId
 newSession uId = do
   tvar <- asks getter 
   sId <- liftIO $ (tshow uId <>) <$> stringRandomIO "[A-Za-z0-9]{16}"
-  liftIO $ atomically $ do
+
+  mayTask <- liftIO $ atomically $ do
     state <- readTVar tvar
-    let sessions = stateSessions state
-        newSessions = Map.insert sId (uId, Nothing) sessions
-        newState = state { stateSessions = newSessions }
+    let (mayAsyncTask, newSessions) = removeOldSession state
+    let newState = state
+          { stateSessions = Map.insert sId (D.newSessionData uId) newSessions
+          , stateUsersSession = Map.insert uId sId (stateUsersSession state)
+          }
     writeTVar tvar newState
-    pure sId
+    pure mayAsyncTask
+    
+  -- WS.sendClose conn ("Closing connection" :: Text)
+  mapM_ cancel mayTask
+  pure sId
+  where
+    removeOldSession :: State -> (Maybe (Async ()), Map D.SessionId D.SessionData)
+    removeOldSession state = case Map.lookup uId (stateUsersSession state) of
+      Nothing -> (Nothing, stateSessions state)
+      Just oldSId -> 
+        let newSessions = Map.delete oldSId (stateSessions state)
+            mayAsyncTask = sessionDataWSLobbyAsyncTask =<< Map.lookup oldSId (stateSessions state)
+        in (mayAsyncTask, newSessions)
+
 
 addWSConnection :: InMemory r m => D.SessionId -> WS.Connection -> m (Either D.SessionError ())
 addWSConnection sId wsConn = do
@@ -77,22 +97,41 @@ addWSConnection sId wsConn = do
     let sessions = stateSessions state
     if Map.member sId sessions
       then do
-        let newSessions = Map.adjust (\(uId,_) -> (uId, Just wsConn)) sId sessions
+        let newSessions = Map.adjust (\sd -> sd{sessionDataMayConn = Just wsConn}) sId sessions
             newState = state { stateSessions = newSessions }
         writeTVar tvar newState
         pure (Right ())
       else pure (Left D.SessionErrorSessionIsNotActive)
+
+
+addWSLobbyAsyncTask :: InMemory r m => D.SessionId -> Async () -> m (Either D.SessionError ())
+addWSLobbyAsyncTask sId asyncTask = do
+  tvar <- asks getter 
+  liftIO $ atomically $ do
+    state <- readTVar tvar
+    let sessions = stateSessions state
+    if Map.member sId sessions
+      then do
+        let newSessions = Map.adjust (\sd -> sd{sessionDataWSLobbyAsyncTask = Just asyncTask}) sId sessions
+            newState = state { stateSessions = newSessions }
+        writeTVar tvar newState
+        pure (Right ())
+      else pure (Left D.SessionErrorSessionIsNotActive)
+
 
 endSession :: InMemory r m => D.SessionId -> m ()
 endSession sId = do
   tvar <- asks getter 
   liftIO $ atomically $ do
     state <- readTVar tvar
-    let sessions = stateSessions state
-        newSessions = Map.delete sId sessions
-        newState = state { stateSessions = newSessions }
-    writeTVar tvar newState
-    pure ()
+    case Map.lookup sId (stateSessions state) of
+      Nothing -> pure ()
+      Just sd -> do
+        let newSessions = Map.delete sId (stateSessions state)
+            newUsersSession = Map.delete (sessionDataUserId sd) (stateUsersSession state)
+            newState = state { stateSessions = newSessions, stateUsersSession = newUsersSession }
+        writeTVar tvar newState
+
 
 notifyEmailVerification :: InMemory r m => D.Email -> D.VerificationCode -> m ()
 notifyEmailVerification email vCode = do
@@ -104,6 +143,7 @@ notifyEmailVerification email vCode = do
         newState = state {stateNotifications = newNotifications}
     writeTVar tvar newState
   sendMail email "Email Verification Code" ("Email Verification Code=" <> vCode)
+
 
 getNotificationsForEmail ::  InMemory r m => D.Email -> m (Maybe D.VerificationCode)
 getNotificationsForEmail email = do
@@ -135,6 +175,7 @@ orThrow :: MonadError e m => Maybe a -> e -> m a
 orThrow Nothing e = throwError e
 orThrow (Just a) _ = pure a
 
+
 setEmailAsVerified :: InMemory r m => D.VerificationCode -> m (Either D.EmailVerificationError (D.UserId, D.Email))
 setEmailAsVerified vCode = do
   tvar <- asks getter
@@ -150,6 +191,7 @@ setEmailAsVerified vCode = do
           }
     lift $ writeTVar tvar newState
     pure (uId, email)
+
 
 addAuth :: InMemory r m => D.Auth -> m (Either D.RegistrationError (D.UserId, D.VerificationCode))
 addAuth auth = do
@@ -250,7 +292,7 @@ runTest = do
       user <- findUserByAuth auth
       email' <- findEmailFromUserId 1
       sId <- newSession 1
-      uId <- findUserIdBySessionId sId
+      uId <- findSessionDataBySessionId sId
       pure (vCode, user, email', sId, uId)
   -- print res0
   pure ()
